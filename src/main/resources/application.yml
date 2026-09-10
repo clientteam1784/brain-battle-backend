@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    # MySQL brain_battle ?????? ??
+    url: jdbc:mysql://localhost:3306/brain_battle
+    # MySQL ??? ??
+    username: root
+    # MySQL ????
+    password: Whalstj24680!
+    # MySQL JDBC ????
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # Entity? ???? ??? ?? ? ??
+      ddl-auto: update
+
+    # ???? SQL ??
+    show-sql: true
+
+    properties:
+      hibernate:
+        # SQL ?? ?? ??
+        format_sql: true
