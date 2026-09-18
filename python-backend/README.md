@@ -1,0 +1,39 @@
+# Brain Battle Python backend
+
+기존 Spring Boot API를 FastAPI, SQLAlchemy 2.x, Alembic으로 옮기는 병행 구현입니다.
+Java 서버가 검증 기준이며, Python API의 경로와 JSON 필드명은 기존 계약을 유지합니다.
+
+## Local setup
+
+Python 3.12 이상과 `uv` 사용을 권장합니다.
+
+```bash
+uv sync --locked --extra dev
+copy .env.example .env
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
+
+- API 문서: <http://localhost:8000/docs>
+- 상태 확인: <http://localhost:8000/health>
+- 테스트: `uv run pytest`
+
+실제 비밀번호는 `.env` 또는 배포 플랫폼의 secret에만 저장하고 Git에는 커밋하지 않습니다.
+
+## Migration strategy
+
+1. 새 테스트 DB에는 `alembic upgrade head`로 스키마를 생성합니다.
+2. 기존 MySQL에는 바로 migration을 실행하지 않습니다. 먼저 데이터 백업과 중복 데이터 검사를 합니다.
+3. 기존 Hibernate 테이블과 Alembic 메타데이터가 일치하면 `alembic stamp 20260911_01`로 기준점을 기록합니다.
+4. Java와 Python 서버에 동일한 API 계약 테스트를 실행합니다.
+5. 스테이징에서 Python 서버를 연결하고 답안 제출, 완료 처리, 순위 정렬을 비교합니다.
+6. 전환이 확인된 뒤 Java 서버를 중단합니다. Java 소스 제거는 별도 커밋으로 수행합니다.
+
+## Intentional hardening
+
+- 문제 번호는 전체에서 유일합니다.
+- 방 안의 모둠 이름, 모둠 안의 학번, 모둠-문제 답안은 각각 복합 유니크 제약을 가집니다.
+- 답안 제출 시 팀과 기존 답안을 잠가 동시 제출로 인한 점수 중복 증가를 방지합니다.
+- 학생 등록 응답은 ORM 객체 전체가 아니라 `id`, `studentNumber`, `teamId`만 반환합니다.
+
+운영 DB에 유니크 제약을 추가하기 전에는 기존 중복 데이터를 반드시 확인해야 합니다.
