@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - "python-backend/**"
+      - "docs/FRONTEND_API_GUIDE.md"
+      - "docs/openapi.json"
       - ".github/workflows/python-backend-ci.yml"
   push:
     branches: [main]
     paths:
       - "python-backend/**"
+      - "docs/FRONTEND_API_GUIDE.md"
+      - "docs/openapi.json"
       - ".github/workflows/python-backend-ci.yml"
 
 jobs:
@@ -29,3 +33,5 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest --cov=app --cov-fail-under=85
+      - run: uv run python scripts/export_openapi.py
+      - run: git diff --exit-code -- ../docs/openapi.json

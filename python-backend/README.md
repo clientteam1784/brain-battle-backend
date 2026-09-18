@@ -17,6 +17,14 @@ uv run uvicorn app.main:app --reload
 - API 문서: <http://localhost:8000/docs>
 - 상태 확인: <http://localhost:8000/health>
 - 테스트: `uv run pytest`
+- 프론트엔드 연동 가이드: `../docs/FRONTEND_API_GUIDE.md`
+- 정적 OpenAPI 명세: `../docs/openapi.json`
+
+API 계약을 변경한 뒤에는 다음 명령으로 정적 OpenAPI 명세를 갱신합니다.
+
+```bash
+uv run python scripts/export_openapi.py
+```
 
 실제 비밀번호는 `.env` 또는 배포 플랫폼의 secret에만 저장하고 Git에는 커밋하지 않습니다.
 
