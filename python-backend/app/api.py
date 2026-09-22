@@ -206,9 +206,7 @@ def submit_answers_batch(
 ) -> BatchAnswerSubmitResponse:
     _require_own_team(principal, team_id)
     progress, graded_count = services.submit_answer_batch(session, team_id, request.answers)
-    return BatchAnswerSubmitResponse.model_validate(
-        {**progress, "gradedCount": graded_count}
-    )
+    return BatchAnswerSubmitResponse.model_validate({**progress, "gradedCount": graded_count})
 
 
 @router.post(

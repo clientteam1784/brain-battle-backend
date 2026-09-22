@@ -81,9 +81,7 @@ def test_health(client: TestClient) -> None:
 
 def test_role_authentication_and_authorization(client: TestClient) -> None:
     assert client.post("/rooms").status_code == 401
-    assert (
-        client.post("/auth/teacher", json={"accessCode": "wrong"}).status_code == 401
-    )
+    assert client.post("/auth/teacher", json={"accessCode": "wrong"}).status_code == 401
 
     teacher = teacher_headers(client)
     create_ten_questions(client, teacher)
@@ -131,9 +129,7 @@ def test_room_requires_exactly_ten_questions_to_start(client: TestClient) -> Non
 
     response = client.patch(f"/rooms/{room['id']}/start", headers=headers)
     assert response.status_code == 400
-    assert response.json() == {
-        "message": "게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다."
-    }
+    assert response.json() == {"message": "게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다."}
 
 
 def test_team_pin_login_and_duplicate_team(client: TestClient) -> None:
@@ -239,10 +235,7 @@ def test_student_scope_and_all_correct_completion(client: TestClient) -> None:
     start_room(client, teacher, room["id"])
     student = student_headers(client, team["pin"])
 
-    assert (
-        client.get(f"/teams/{other_team['id']}/progress", headers=student).status_code
-        == 403
-    )
+    assert client.get(f"/teams/{other_team['id']}/progress", headers=student).status_code == 403
     response = client.post(
         f"/teams/{team['id']}/answers/batch",
         headers=student,
@@ -276,11 +269,7 @@ def test_answer_is_rejected_before_room_starts(client: TestClient) -> None:
     response = client.post(
         f"/teams/{team['id']}/answers/batch",
         headers=student,
-        json={
-            "answers": [
-                {"questionId": questions[0]["id"], "submittedAnswer": "정답1"}
-            ]
-        },
+        json={"answers": [{"questionId": questions[0]["id"], "submittedAnswer": "정답1"}]},
     )
     assert response.status_code == 400
     assert response.json() == {"message": "아직 게임이 시작되지 않았습니다."}
