@@ -10,6 +10,9 @@ class Settings(BaseSettings):
         "mysql+pymysql://brain_battle:change-me@localhost:3306/brain_battle?charset=utf8mb4"
     )
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    jwt_secret: str = "development-only-change-me"
+    jwt_expire_minutes: int = 480
+    teacher_access_code: str = "teacher-dev-code"
 
     model_config = SettingsConfigDict(
         env_file=".env",

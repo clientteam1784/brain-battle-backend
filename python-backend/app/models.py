@@ -23,11 +23,16 @@ class Room(Base):
 
 class Team(Base):
     __tablename__ = "team"
-    __table_args__ = (UniqueConstraint("room_id", "name", name="uq_team_room_name"),)
+    __table_args__ = (
+        UniqueConstraint("room_id", "name", name="uq_team_room_name"),
+        UniqueConstraint("pin", name="uq_team_pin"),
+    )
 
     id: Mapped[PrimaryKey]
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    pin: Mapped[str] = mapped_column(String(6), nullable=False)
     current_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    submission_round: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     finished: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     room_id: Mapped[int] = mapped_column(
@@ -87,6 +92,7 @@ class Answer(Base):
     correct: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     modify_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    wrong_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     team: Mapped[Team] = relationship(back_populates="answers")
     question: Mapped[Question] = relationship(back_populates="answers")

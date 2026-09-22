@@ -1,6 +1,7 @@
 from datetime import datetime
+from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ApiModel(BaseModel):
@@ -32,6 +33,24 @@ class RoomResponse(ApiModel):
     started: bool
 
 
+class TeacherLoginRequest(ApiModel):
+    access_code: str = Field(alias="accessCode", min_length=1)
+
+
+class StudentLoginRequest(ApiModel):
+    team_pin: str = Field(alias="teamPin", min_length=6, max_length=6)
+    student_number: str = Field(alias="studentNumber", min_length=1)
+
+
+class AuthTokenResponse(ApiModel):
+    access_token: str = Field(alias="accessToken")
+    token_type: str = Field(default="bearer", alias="tokenType")
+    role: str
+    expires_in: int = Field(alias="expiresIn")
+    student_id: int | None = Field(default=None, alias="studentId")
+    team_id: int | None = Field(default=None, alias="teamId")
+
+
 class TeamJoinRequest(ApiModel):
     team_name: str = Field(alias="teamName")
 
@@ -46,7 +65,9 @@ class TeamJoinRequest(ApiModel):
 class TeamResponse(ApiModel):
     id: int
     name: str
+    pin: str
     current_count: int = Field(alias="currentCount")
+    submission_round: int = Field(alias="submissionRound")
     finished: bool
 
 
@@ -73,6 +94,57 @@ class AnswerResponse(ApiModel):
     correct: bool
     submit_count: int = Field(alias="submitCount")
     modify_count: int = Field(alias="modifyCount")
+    wrong_count: int = Field(alias="wrongCount")
+
+
+class AnswerStatus(StrEnum):
+    UNSUBMITTED = "UNSUBMITTED"
+    WRONG = "WRONG"
+    CORRECT = "CORRECT"
+    EXHAUSTED = "EXHAUSTED"
+
+
+class BatchAnswerItem(ApiModel):
+    question_id: int = Field(alias="questionId", ge=1)
+    submitted_answer: str | None = Field(default=None, alias="submittedAnswer")
+
+
+class BatchAnswerSubmitRequest(ApiModel):
+    answers: list[BatchAnswerItem] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def question_ids_must_be_unique(self) -> "BatchAnswerSubmitRequest":
+        ids = [answer.question_id for answer in self.answers]
+        if len(ids) != len(set(ids)):
+            raise ValueError("같은 문제를 중복 제출할 수 없습니다.")
+        return self
+
+
+class QuestionProgressResponse(ApiModel):
+    question_id: int = Field(alias="questionId")
+    question_number: int = Field(alias="questionNumber")
+    status: AnswerStatus
+    submitted_answer: str | None = Field(alias="submittedAnswer")
+    submit_count: int = Field(alias="submitCount")
+    wrong_count: int = Field(alias="wrongCount")
+    max_submit_count: int = Field(alias="maxSubmitCount")
+    remaining_attempts: int = Field(alias="remainingAttempts")
+    locked: bool
+
+
+class TeamProgressResponse(ApiModel):
+    team_id: int = Field(alias="teamId")
+    submission_round: int = Field(alias="submissionRound")
+    correct_count: int = Field(alias="correctCount")
+    total_questions: int = Field(alias="totalQuestions")
+    finished: bool
+    questions: list[QuestionProgressResponse]
+    rotation_question_ids: list[int] = Field(alias="rotationQuestionIds")
+    next_question_id: int | None = Field(alias="nextQuestionId")
+
+
+class BatchAnswerSubmitResponse(TeamProgressResponse):
+    graded_count: int = Field(alias="gradedCount")
 
 
 class RankingResponse(ApiModel):

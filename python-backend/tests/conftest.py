@@ -1,6 +1,8 @@
 import os
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
+os.environ["JWT_SECRET"] = "test-jwt-secret-at-least-32-bytes-long"
+os.environ["TEACHER_ACCESS_CODE"] = "test-teacher-code"
 
 import pytest
 from fastapi.testclient import TestClient

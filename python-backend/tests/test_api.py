@@ -1,32 +1,76 @@
 from fastapi.testclient import TestClient
 
 
-def create_question(client: TestClient, number: int, answer: str = "정답") -> dict:
+def teacher_headers(client: TestClient) -> dict[str, str]:
+    response = client.post("/auth/teacher", json={"accessCode": "test-teacher-code"})
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['accessToken']}"}
+
+
+def student_headers(
+    client: TestClient,
+    team_pin: str,
+    student_number: str = "20260001",
+) -> dict[str, str]:
+    response = client.post(
+        "/auth/student",
+        json={"teamPin": team_pin, "studentNumber": student_number},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['accessToken']}"}
+
+
+def create_question(
+    client: TestClient,
+    headers: dict[str, str],
+    number: int,
+    max_submit_count: int = 2,
+) -> dict:
     response = client.post(
         "/questions",
+        headers=headers,
         json={
             "questionNumber": number,
-            "answer": answer,
-            "maxSubmitCount": 2,
+            "answer": f"정답{number}",
+            "maxSubmitCount": max_submit_count,
         },
     )
     assert response.status_code == 200
     return response.json()
 
 
-def create_started_team(client: TestClient, name: str = "1모둠") -> tuple[int, int]:
-    room_response = client.post("/rooms")
+def create_ten_questions(client: TestClient, headers: dict[str, str]) -> list[dict]:
+    return [
+        create_question(
+            client,
+            headers,
+            number,
+            max_submit_count=1 if number == 4 else 2,
+        )
+        for number in range(1, 11)
+    ]
+
+
+def create_team(
+    client: TestClient,
+    headers: dict[str, str],
+    name: str = "1모둠",
+) -> tuple[dict, dict]:
+    room_response = client.post("/rooms", headers=headers)
     assert room_response.status_code == 200
     room = room_response.json()
     team_response = client.post(
-        f"/rooms/{room['pin']}/teams",
+        f"/rooms/{room['id']}/teams",
+        headers=headers,
         json={"teamName": name},
     )
     assert team_response.status_code == 200
-    team = team_response.json()
-    start_response = client.patch(f"/rooms/{room['id']}/start")
-    assert start_response.status_code == 200
-    return room["id"], team["id"]
+    return room, team_response.json()
+
+
+def start_room(client: TestClient, headers: dict[str, str], room_id: int) -> None:
+    response = client.patch(f"/rooms/{room_id}/start", headers=headers)
+    assert response.status_code == 200
 
 
 def test_health(client: TestClient) -> None:
@@ -35,12 +79,33 @@ def test_health(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_role_authentication_and_authorization(client: TestClient) -> None:
+    assert client.post("/rooms").status_code == 401
+    assert (
+        client.post("/auth/teacher", json={"accessCode": "wrong"}).status_code == 401
+    )
+
+    teacher = teacher_headers(client)
+    create_ten_questions(client, teacher)
+    _, team = create_team(client, teacher)
+    student = student_headers(client, team["pin"])
+
+    assert client.post("/rooms", headers=student).status_code == 403
+    invalid_pin = client.post(
+        "/auth/student",
+        json={"teamPin": "000000", "studentNumber": "20260002"},
+    )
+    assert invalid_pin.status_code == 401
+
+
 def test_question_crud_and_validation_contract(client: TestClient) -> None:
-    question = create_question(client, 2)
+    headers = teacher_headers(client)
+    question = create_question(client, headers, 2)
     assert question == {"id": 1, "questionNumber": 2, "maxSubmitCount": 2}
 
     invalid = client.post(
         "/questions",
+        headers=headers,
         json={"questionNumber": 0, "answer": "", "maxSubmitCount": 0},
     )
     assert invalid.status_code == 400
@@ -48,96 +113,174 @@ def test_question_crud_and_validation_contract(client: TestClient) -> None:
 
     updated = client.patch(
         f"/questions/{question['id']}",
+        headers=headers,
         json={"questionNumber": 1, "answer": "새 정답", "maxSubmitCount": 3},
     )
     assert updated.status_code == 200
     assert updated.json()["questionNumber"] == 1
 
-    listed = client.get("/questions")
-    assert listed.status_code == 200
+    listed = client.get("/questions", headers=headers)
     assert listed.json() == [{"id": 1, "questionNumber": 1, "maxSubmitCount": 3}]
-
-    deleted = client.delete(f"/questions/{question['id']}")
-    assert deleted.status_code == 204
+    assert client.delete(f"/questions/{question['id']}", headers=headers).status_code == 204
 
 
-def test_room_team_and_student_flow(client: TestClient) -> None:
-    room = client.post("/rooms").json()
-    assert len(room["pin"]) == 6
-    assert room["started"] is False
+def test_room_requires_exactly_ten_questions_to_start(client: TestClient) -> None:
+    headers = teacher_headers(client)
+    create_question(client, headers, 1)
+    room, _ = create_team(client, headers)
 
-    team = client.post(
-        f"/rooms/{room['pin']}/teams",
-        json={"teamName": "파이썬팀"},
-    ).json()
-    assert team["currentCount"] == 0
-
-    duplicate = client.post(
-        f"/rooms/{room['pin']}/teams",
-        json={"teamName": "파이썬팀"},
-    )
-    assert duplicate.status_code == 400
-    assert duplicate.json() == {"message": "이미 존재하는 모둠 이름입니다."}
-
-    student = client.post(
-        f"/teams/{team['id']}/students",
-        params={"studentNumber": "20260001"},
-    )
-    assert student.status_code == 200
-    assert student.json() == {
-        "id": 1,
-        "studentNumber": "20260001",
-        "teamId": team["id"],
+    response = client.patch(f"/rooms/{room['id']}/start", headers=headers)
+    assert response.status_code == 400
+    assert response.json() == {
+        "message": "게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다."
     }
 
 
-def test_answer_submission_and_ranking(client: TestClient) -> None:
-    question = create_question(client, 1, "Python")
-    room_id, team_id = create_started_team(client)
+def test_team_pin_login_and_duplicate_team(client: TestClient) -> None:
+    headers = teacher_headers(client)
+    room, team = create_team(client, headers, "파이썬팀")
+    assert len(room["pin"]) == 6
+    assert len(team["pin"]) == 6
+    assert team["submissionRound"] == 0
 
-    wrong = client.post(
-        f"/teams/{team_id}/answers/{question['id']}",
-        json={"submittedAnswer": "Java"},
+    duplicate = client.post(
+        f"/rooms/{room['id']}/teams",
+        headers=headers,
+        json={"teamName": "파이썬팀"},
     )
-    assert wrong.status_code == 200
-    assert wrong.json()["correct"] is False
-    assert wrong.json()["submitCount"] == 1
+    assert duplicate.status_code == 400
 
-    correct = client.post(
-        f"/teams/{team_id}/answers/{question['id']}",
-        json={"submittedAnswer": " python "},
+    token = client.post(
+        "/auth/student",
+        json={"teamPin": team["pin"], "studentNumber": "20260001"},
     )
-    assert correct.status_code == 200
-    assert correct.json()["correct"] is True
-    assert correct.json()["submitCount"] == 2
-    assert correct.json()["modifyCount"] == 1
+    assert token.status_code == 200
+    assert token.json()["role"] == "student"
+    assert token.json()["teamId"] == team["id"]
+    assert token.json()["studentId"] == 1
 
-    ranking = client.get(f"/rooms/{room_id}/ranking")
+
+def test_batch_grading_distinguishes_unsubmitted_wrong_and_exhausted(
+    client: TestClient,
+) -> None:
+    teacher = teacher_headers(client)
+    questions = create_ten_questions(client, teacher)
+    room, team = create_team(client, teacher)
+    start_room(client, teacher, room["id"])
+    student = student_headers(client, team["pin"])
+
+    answers = [
+        {"questionId": questions[0]["id"], "submittedAnswer": "정답1"},
+        {"questionId": questions[1]["id"], "submittedAnswer": "오답"},
+        {"questionId": questions[2]["id"], "submittedAnswer": None},
+        {"questionId": questions[3]["id"], "submittedAnswer": "오답"},
+    ]
+    answers.extend(
+        {
+            "questionId": question["id"],
+            "submittedAnswer": f"정답{question['questionNumber']}",
+        }
+        for question in questions[4:]
+    )
+    response = client.post(
+        f"/teams/{team['id']}/answers/batch",
+        headers=student,
+        json={"answers": answers},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["submissionRound"] == 1
+    assert payload["gradedCount"] == 9
+    assert payload["correctCount"] == 7
+    assert payload["rotationQuestionIds"] == [questions[1]["id"], questions[2]["id"]]
+    assert payload["nextQuestionId"] == questions[1]["id"]
+
+    progress = {item["questionNumber"]: item for item in payload["questions"]}
+    assert progress[1]["status"] == "CORRECT"
+    assert progress[1]["locked"] is True
+    assert progress[2]["status"] == "WRONG"
+    assert progress[2]["wrongCount"] == 1
+    assert progress[2]["remainingAttempts"] == 1
+    assert progress[3]["status"] == "UNSUBMITTED"
+    assert progress[3]["wrongCount"] == 0
+    assert progress[4]["status"] == "EXHAUSTED"
+    assert progress[4]["locked"] is True
+
+    second = client.post(
+        f"/teams/{team['id']}/answers/batch",
+        headers=student,
+        json={
+            "answers": [
+                {"questionId": questions[1]["id"], "submittedAnswer": "정답2"},
+                {"questionId": questions[2]["id"], "submittedAnswer": ""},
+            ]
+        },
+    )
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["gradedCount"] == 1
+    assert second_payload["rotationQuestionIds"] == [questions[2]["id"]]
+    question_three = next(
+        item for item in second_payload["questions"] if item["questionNumber"] == 3
+    )
+    assert question_three["status"] == "UNSUBMITTED"
+    assert question_three["wrongCount"] == 0
+
+
+def test_student_scope_and_all_correct_completion(client: TestClient) -> None:
+    teacher = teacher_headers(client)
+    questions = create_ten_questions(client, teacher)
+    room, team = create_team(client, teacher, "A팀")
+    other_team = client.post(
+        f"/rooms/{room['id']}/teams",
+        headers=teacher,
+        json={"teamName": "B팀"},
+    ).json()
+    start_room(client, teacher, room["id"])
+    student = student_headers(client, team["pin"])
+
+    assert (
+        client.get(f"/teams/{other_team['id']}/progress", headers=student).status_code
+        == 403
+    )
+    response = client.post(
+        f"/teams/{team['id']}/answers/batch",
+        headers=student,
+        json={
+            "answers": [
+                {
+                    "questionId": question["id"],
+                    "submittedAnswer": f"정답{question['questionNumber']}",
+                }
+                for question in questions
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["finished"] is True
+    assert response.json()["correctCount"] == 10
+    assert response.json()["rotationQuestionIds"] == []
+
+    ranking = client.get(f"/rooms/{room['id']}/ranking", headers=student)
     assert ranking.status_code == 200
-    assert ranking.json()[0]["rank"] == 1
-    assert ranking.json()[0]["currentCount"] == 1
+    assert ranking.json()[0]["currentCount"] == 10
     assert ranking.json()[0]["finished"] is True
-    assert ranking.json()[0]["finishedAt"] is not None
-
-    repeated = client.post(
-        f"/teams/{team_id}/answers/{question['id']}",
-        json={"submittedAnswer": "Python"},
-    )
-    assert repeated.status_code == 400
-    assert repeated.json() == {"message": "이미 모든 문제를 완료한 모둠입니다."}
 
 
 def test_answer_is_rejected_before_room_starts(client: TestClient) -> None:
-    question = create_question(client, 1)
-    room = client.post("/rooms").json()
-    team = client.post(
-        f"/rooms/{room['pin']}/teams",
-        json={"teamName": "대기팀"},
-    ).json()
+    teacher = teacher_headers(client)
+    questions = create_ten_questions(client, teacher)
+    _, team = create_team(client, teacher, "대기팀")
+    student = student_headers(client, team["pin"])
 
     response = client.post(
-        f"/teams/{team['id']}/answers/{question['id']}",
-        json={"submittedAnswer": "정답"},
+        f"/teams/{team['id']}/answers/batch",
+        headers=student,
+        json={
+            "answers": [
+                {"questionId": questions[0]["id"], "submittedAnswer": "정답1"}
+            ]
+        },
     )
     assert response.status_code == 400
     assert response.json() == {"message": "아직 게임이 시작되지 않았습니다."}

@@ -1,73 +1,81 @@
-# Brain Battle Frontend API Guide
+# Brain Battle 프론트엔드 API 가이드
 
-이 문서는 `migration/python-fastapi` 브랜치의 Python 백엔드와 프론트엔드를 연동하기 위한 계약입니다.
+현재 `main` 브랜치의 Python/FastAPI 백엔드 계약입니다. 로컬 API 주소는
+`http://localhost:8000`이고 Swagger UI는 `/docs`에서 볼 수 있습니다.
 
-## Connection
+## 공통 규칙
 
-| Environment | API base URL |
-| --- | --- |
-| Local | `http://localhost:8000` |
-| Swagger UI | `http://localhost:8000/docs` |
-| OpenAPI JSON | `http://localhost:8000/openapi.json` |
-| Production | 배포 주소 확정 후 프론트엔드 환경변수에 설정 |
+- 로그인 이외의 모든 API는 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
+- 교사 전용 API를 학생 토큰으로 호출하면 `403`, 토큰이 없거나 유효하지 않으면 `401`입니다.
+- PIN과 학번은 앞자리 0 보존을 위해 항상 문자열로 처리합니다.
+- 오류 응답은 `{"message": "오류 내용"}` 형식입니다.
+- 기본 CORS origin은 `http://localhost:3000`이며 서버의 `CORS_ORIGINS`로 변경합니다.
 
-프론트엔드에서는 API 주소를 코드에 직접 넣지 말고 환경변수로 관리합니다.
+## 로그인과 역할
 
-```env
-VITE_API_BASE_URL=http://localhost:8000
+### 교사 로그인
+
+```http
+POST /auth/teacher
+Content-Type: application/json
+
+{"accessCode": "교사용 접근 코드"}
 ```
 
-Next.js를 사용한다면 공개 환경변수 이름을 `NEXT_PUBLIC_API_BASE_URL`로 변경합니다.
+### 학생 로그인
 
-- 모든 JSON 요청은 `Content-Type: application/json`을 사용합니다.
-- 현재 API prefix는 없습니다. 예: `/api/questions`가 아니라 `/questions`입니다.
-- 현재 인증과 사용자 로그인은 없습니다. `Authorization` 헤더도 사용하지 않습니다.
-- 기본 허용 origin은 `http://localhost:3000`이며 백엔드의 `CORS_ORIGINS`로 변경할 수 있습니다.
+교사가 팀 생성 시 받은 `pin`을 학생에게 전달합니다. 이 PIN을 아는 학생만 해당 팀으로
+로그인할 수 있습니다. 처음 로그인한 학번은 해당 팀에 자동 등록됩니다.
 
-## Common error response
+```http
+POST /auth/student
+Content-Type: application/json
 
-비즈니스 오류와 입력값 검증 오류는 다음 형식입니다.
+{"teamPin": "583021", "studentNumber": "20260001"}
+```
+
+두 로그인 응답의 공통 형식입니다.
 
 ```json
 {
-  "message": "존재하지 않는 모둠입니다."
+  "accessToken": "eyJ...",
+  "tokenType": "bearer",
+  "role": "student",
+  "expiresIn": 28800,
+  "studentId": 15,
+  "teamId": 7
 }
 ```
 
-| Status | Meaning |
-| --- | --- |
-| `400` | 입력값 또는 현재 게임 상태가 올바르지 않음 |
-| `409` | 동일 답안이 동시에 제출됨 |
-| `503` | 고유한 방 PIN 생성 실패 |
+교사 로그인에서는 `studentId`와 `teamId`가 `null`입니다. 토큰은 기본 8시간 유효하며,
+프론트엔드는 `401`을 받으면 로그인 화면으로 이동합니다.
 
-프론트엔드는 오류 응답의 `message`를 사용자 메시지로 표시할 수 있습니다.
+## API 권한 요약
 
-## API summary
-
-| Method | Path | Description | Success |
+| Method | Path | 권한 | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/health` | 서버 상태 확인 | `200` |
-| `POST` | `/questions` | 문제 생성 | `200` |
-| `GET` | `/questions` | 문제 번호순 전체 조회 | `200` |
-| `PATCH` | `/questions/{questionId}` | 문제 수정 | `200` |
-| `DELETE` | `/questions/{questionId}` | 문제 삭제 | `204` |
-| `POST` | `/rooms` | 방 생성 | `200` |
-| `PATCH` | `/rooms/{roomId}/start` | 게임 시작 | `200` |
-| `POST` | `/rooms/{pin}/teams` | PIN으로 팀 참가 | `200` |
-| `POST` | `/teams/{teamId}/students?studentNumber=...` | 학생 등록 | `200` |
-| `POST` | `/teams/{teamId}/answers/{questionId}` | 답안 제출 | `200` |
-| `GET` | `/rooms/{roomId}/ranking` | 방 순위 조회 | `200` |
+| `POST` | `/auth/teacher` | 공개 | 교사 로그인 |
+| `POST` | `/auth/student` | 공개 | 팀 PIN으로 학생 로그인 |
+| `POST/PATCH/DELETE` | `/questions...` | 교사 | 문제 관리 |
+| `GET` | `/questions` | 교사/학생 | 1~10번 문제 목록 |
+| `POST` | `/rooms` | 교사 | 방 생성 |
+| `PATCH` | `/rooms/{roomId}/start` | 교사 | 게임 시작 |
+| `POST` | `/rooms/{roomId}/teams` | 교사 | 팀과 팀 PIN 생성 |
+| `GET` | `/teams/{teamId}/progress` | 해당 팀/교사 | 팀 풀이 상태 조회 |
+| `POST` | `/teams/{teamId}/answers/batch` | 해당 팀 학생 | 답안 일괄 채점 |
+| `GET` | `/rooms/{roomId}/ranking` | 해당 방 학생/교사 | 순위 조회 |
 
-## Questions
+학생 토큰으로 다른 팀의 진행 상태/제출 API나 다른 방의 순위 API에 접근하면 `403`입니다.
 
-### Create question
+## 교사 흐름
+
+### 문제 등록
 
 ```http
 POST /questions
+Authorization: Bearer {teacherToken}
 Content-Type: application/json
-```
 
-```json
 {
   "questionNumber": 1,
   "answer": "Python",
@@ -75,204 +83,156 @@ Content-Type: application/json
 }
 ```
 
-`questionNumber`와 `maxSubmitCount`는 1 이상이며 `answer`는 빈 문자열일 수 없습니다.
+`maxSubmitCount`가 난이도별 최대 시도 횟수입니다. 1 이상의 값을 문제마다 다르게 지정할 수
+있습니다. 응답과 `GET /questions`에는 정답 `answer`가 노출되지 않습니다.
 
 ```json
-{
-  "id": 1,
-  "questionNumber": 1,
-  "maxSubmitCount": 3
-}
+{"id": 1, "questionNumber": 1, "maxSubmitCount": 3}
 ```
 
-정답인 `answer`는 생성 응답과 전체 조회 응답에 포함되지 않습니다.
+게임 시작 시 문제 번호가 정확히 1번부터 10번까지 존재해야 합니다.
 
-### List questions
-
-```http
-GET /questions
-```
-
-```json
-[
-  {
-    "id": 1,
-    "questionNumber": 1,
-    "maxSubmitCount": 3
-  }
-]
-```
-
-### Update question
-
-```http
-PATCH /questions/1
-Content-Type: application/json
-```
-
-요청 body는 문제 생성과 같습니다. 부분 수정이 아니라 세 필드를 모두 전송해야 합니다.
-
-### Delete question
-
-```http
-DELETE /questions/1
-```
-
-성공하면 body 없이 `204 No Content`를 반환합니다.
-
-## Rooms and teams
-
-### Create room
+### 방과 팀 생성
 
 ```http
 POST /rooms
+Authorization: Bearer {teacherToken}
 ```
-
-요청 body는 없습니다.
 
 ```json
-{
-  "id": 1,
-  "pin": "482193",
-  "started": false
-}
+{"id": 1, "pin": "482193", "started": false}
 ```
-
-`pin`은 항상 6자리 문자열이므로 숫자로 변환하지 않습니다. 앞자리 0은 현재 생성되지 않지만 문자열 계약을 유지해야 합니다.
-
-### Join room as a team
 
 ```http
-POST /rooms/482193/teams
+POST /rooms/1/teams
+Authorization: Bearer {teacherToken}
 Content-Type: application/json
-```
 
-```json
-{
-  "teamName": "파이썬팀"
-}
+{"teamName": "파이썬팀"}
 ```
 
 ```json
 {
   "id": 7,
   "name": "파이썬팀",
+  "pin": "583021",
   "currentCount": 0,
+  "submissionRound": 0,
   "finished": false
 }
 ```
 
-같은 방에서는 팀 이름을 중복해서 사용할 수 없습니다.
-
-### Start game
+방 PIN은 방 식별용이고, 팀 PIN은 학생의 팀 입장/로그인용입니다.
 
 ```http
 PATCH /rooms/1/start
+Authorization: Bearer {teacherToken}
+```
+
+## 학생 문제 화면과 이동
+
+처음에는 `GET /questions`의 `questionNumber` 순서대로 1번부터 10번까지 보여 줍니다.
+Enter 입력과 문항 번호 클릭은 프론트엔드의 현재 문항 인덱스만 변경합니다. Enter로 이동해도
+채점 요청을 보내지 말고, 화면의 단일 제출 버튼을 눌렀을 때만 일괄 제출합니다.
+
+초기 상태와 재접속 복원은 다음 API를 사용합니다.
+
+```http
+GET /teams/7/progress
+Authorization: Bearer {studentToken}
 ```
 
 ```json
 {
-  "id": 1,
-  "pin": "482193",
-  "started": true
+  "teamId": 7,
+  "submissionRound": 1,
+  "correctCount": 7,
+  "totalQuestions": 10,
+  "finished": false,
+  "questions": [
+    {
+      "questionId": 1,
+      "questionNumber": 1,
+      "status": "CORRECT",
+      "submittedAnswer": "Python",
+      "submitCount": 1,
+      "wrongCount": 0,
+      "maxSubmitCount": 3,
+      "remainingAttempts": 2,
+      "locked": true
+    }
+  ],
+  "rotationQuestionIds": [2, 3],
+  "nextQuestionId": 2
 }
 ```
 
-## Students
+상태 값의 의미는 다음과 같습니다.
+
+| status | 의미 | 다시 제출 가능 |
+| --- | --- | --- |
+| `UNSUBMITTED` | 빈칸 또는 아직 제출하지 않음 | 예 |
+| `WRONG` | 제출했지만 오답이며 기회가 남음 | 예 |
+| `CORRECT` | 정답 | 아니요 |
+| `EXHAUSTED` | 오답이며 최대 시도 횟수 소진 | 아니요 |
+
+`wrongCount`는 오답을 실제로 채점한 경우에만 증가합니다. 빈칸/미제출은 `submitCount`와
+`wrongCount` 모두 증가하지 않습니다. `locked: true`인 문항 입력은 비활성화합니다.
+
+## 단일 버튼 일괄 제출
 
 ```http
-POST /teams/7/students?studentNumber=20260001
-```
-
-요청 body가 아니라 `studentNumber` query parameter를 사용합니다.
-
-```json
-{
-  "id": 15,
-  "studentNumber": "20260001",
-  "teamId": 7
-}
-```
-
-Java 구현은 ORM 엔티티를 직접 반환했지만 Python 구현은 순환 참조와 내부 정보 노출을 피하기 위해 위 세 필드만 반환합니다. 같은 팀에는 동일한 학번을 중복 등록할 수 없습니다.
-
-## Answers
-
-```http
-POST /teams/7/answers/1
+POST /teams/7/answers/batch
+Authorization: Bearer {studentToken}
 Content-Type: application/json
 ```
 
 ```json
 {
-  "submittedAnswer": "Python"
+  "answers": [
+    {"questionId": 1, "submittedAnswer": "Python"},
+    {"questionId": 2, "submittedAnswer": ""},
+    {"questionId": 3, "submittedAnswer": null}
+  ]
 }
 ```
 
-```json
-{
-  "id": 20,
-  "submittedAnswer": "Python",
-  "correct": true,
-  "submitCount": 2,
-  "modifyCount": 1
-}
-```
+- 최대 10개 문항을 한 요청에 보냅니다.
+- 빈 문자열, 공백 또는 `null`은 미제출로 처리되어 횟수가 증가하지 않습니다.
+- 이미 `CORRECT` 또는 `EXHAUSTED`인 문항은 재채점하지 않습니다.
+- 응답은 진행 상태와 동일한 필드에 이번 요청에서 실제 채점한 `gradedCount`가 추가됩니다.
+- 요청 처리 중 제출 버튼을 비활성화해 중복 클릭을 막습니다.
 
-- 게임 시작 전에는 답안을 제출할 수 없습니다.
-- 이미 맞힌 문제에는 다시 제출할 수 없습니다.
-- 최대 제출 횟수에 도달하면 다시 제출할 수 없습니다.
-- 정답 비교는 앞뒤 공백과 영문 대소문자를 무시합니다.
-- 모든 문제를 맞히면 해당 팀의 `finished`가 `true`가 됩니다.
-- 제출 버튼은 요청 처리 중 비활성화하여 동일 요청의 연속 전송을 방지해야 합니다.
+첫 제출 후에는 응답의 `rotationQuestionIds` 순서대로 미제출/오답 문항만 순환시킵니다.
+정답 및 횟수 소진 문항은 로테이션에서 제외됩니다. 다음 문항은 `nextQuestionId`를 사용하며,
+목록이 비면 `null`입니다.
 
-## Ranking
+모든 문항이 정답이면 `finished: true`가 됩니다. 횟수를 소진한 문항이 있다면 로테이션은
+끝날 수 있지만 `finished`는 `false`일 수 있으므로 두 값을 구분해야 합니다.
+
+기존 단건 제출 API `/teams/{teamId}/answers/{questionId}`는 호환 목적으로만 남아 있으며
+deprecated 상태입니다. 새 프론트엔드는 일괄 제출 API만 사용합니다.
+
+## 순위
 
 ```http
 GET /rooms/1/ranking
+Authorization: Bearer {token}
 ```
 
-```json
-[
-  {
-    "rank": 1,
-    "teamName": "파이썬팀",
-    "currentCount": 10,
-    "finished": true,
-    "finishedAt": "2026-09-18T14:30:12.123456"
-  },
-  {
-    "rank": 2,
-    "teamName": "알고리즘팀",
-    "currentCount": 8,
-    "finished": false,
-    "finishedAt": null
-  }
-]
-```
+완료 팀 우선/완료 시간순, 미완료 팀은 정답 수 내림차순으로 정렬합니다. WebSocket은 아직
+없으므로 순위 화면은 2초 이상의 간격으로 폴링하고 백그라운드 탭에서는 중지합니다.
 
-정렬 기준은 다음 순서입니다.
+## 프론트엔드 체크리스트
 
-1. 모든 문제를 완료한 팀 우선
-2. 완료 팀은 완료 시간이 빠른 순서
-3. 미완료 팀은 정답 수가 많은 순서
-4. 나머지가 같으면 팀 ID가 빠른 순서
+- [ ] API 주소를 `VITE_API_BASE_URL` 또는 `NEXT_PUBLIC_API_BASE_URL`로 관리
+- [ ] 로그인 후 모든 요청에 Bearer 토큰 첨부
+- [ ] 방 PIN, 팀 PIN, 학번을 문자열로 보관
+- [ ] Enter/문항 클릭은 이동만 수행하고 단일 제출 버튼에서 일괄 채점
+- [ ] 상태별 표시: 미제출/오답/정답/기회 소진
+- [ ] `rotationQuestionIds`, `nextQuestionId`로 재도전 순서 처리
+- [ ] `remainingAttempts`와 문제별 최대 횟수 표시
+- [ ] `locked` 문항 비활성화
+- [ ] `401` 재로그인, `403` 권한 오류, `message` 사용자 표시
 
-`finishedAt`은 timezone 정보가 없는 ISO 8601 문자열 또는 `null`입니다.
-
-현재 WebSocket은 구현되어 있지 않습니다. 실시간 순위 화면은 우선 `GET /rooms/{roomId}/ranking`을 폴링해야 하며 권장 주기는 2초 이상입니다. 브라우저 탭이 백그라운드에 있으면 폴링을 중지하는 것이 좋습니다.
-
-## Frontend integration checklist
-
-- [ ] API base URL을 환경변수로 분리
-- [ ] `studentNumber`를 query parameter로 전송
-- [ ] 방 PIN을 문자열로 보관
-- [ ] `204` 응답에서 JSON 파싱하지 않기
-- [ ] `finishedAt: null` 처리
-- [ ] 오류 응답의 `message` 표시
-- [ ] 답안 제출 중 버튼 비활성화
-- [ ] 순위 조회 폴링 시작·종료 처리
-- [ ] 운영 프론트엔드 주소를 백엔드 `CORS_ORIGINS`에 등록
-
-기계 판독 가능한 전체 계약은 같은 디렉터리의 `openapi.json`을 사용합니다.
-
+전체 기계 판독 계약은 [openapi.json](./openapi.json)을 사용합니다.
