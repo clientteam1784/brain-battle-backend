@@ -71,6 +71,13 @@ class TeamResponse(ApiModel):
     finished: bool
 
 
+class TeamSummaryResponse(ApiModel):
+    id: int
+    name: str
+    current_count: int = Field(alias="currentCount")
+    finished: bool
+
+
 class StudentResponse(ApiModel):
     id: int
     student_number: str = Field(alias="studentNumber")
@@ -88,13 +95,25 @@ class AnswerSubmitRequest(ApiModel):
         return value
 
 
-class AnswerResponse(ApiModel):
+class SingleAnswerResponse(ApiModel):
     id: int
     submitted_answer: str = Field(alias="submittedAnswer")
     correct: bool
     submit_count: int = Field(alias="submitCount")
     modify_count: int = Field(alias="modifyCount")
-    wrong_count: int = Field(alias="wrongCount")
+
+
+class TeamScoreResponse(ApiModel):
+    current_count: int = Field(alias="currentCount")
+
+
+class RemainingQuestionsResponse(ApiModel):
+    remaining_count: int = Field(alias="remainingCount")
+
+
+class AnswerCountsResponse(ApiModel):
+    submit_count: int = Field(alias="submitCount")
+    modify_count: int = Field(alias="modifyCount")
 
 
 class AnswerStatus(StrEnum):

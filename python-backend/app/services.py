@@ -42,7 +42,7 @@ def update_question(
 ) -> Question:
     question = session.get(Question, question_id)
     if question is None:
-        raise DomainError("존재하지 않는 문제입니다.")
+        raise DomainError("존재하지 않는 문제입니다.", 404, include_status=True)
     question.question_number = question_number
     question.answer = answer.strip()
     question.max_submit_count = max_submit_count
@@ -56,7 +56,7 @@ def update_question(
 def delete_question(session: Session, question_id: int) -> None:
     question = session.get(Question, question_id)
     if question is None:
-        raise DomainError("존재하지 않는 문제입니다.")
+        raise DomainError("존재하지 않는 문제입니다.", 404, include_status=True)
     session.delete(question)
 
 
@@ -69,16 +69,21 @@ def _unique_pin(session: Session, model: type[Room] | type[Team], label: str) ->
 
 
 def create_room(session: Session) -> Room:
-    room = Room(pin=_unique_pin(session, Room, "방"))
-    session.add(room)
-    session.flush()
+    try:
+        room = Room(pin=_unique_pin(session, Room, "방"))
+        session.add(room)
+        session.flush()
+    except (DomainError, IntegrityError) as exc:
+        raise DomainError("방 생성에 실패했습니다.", 500, include_status=True) from exc
     return room
 
 
 def start_room(session: Session, room_id: int) -> Room:
     room = session.get(Room, room_id)
     if room is None:
-        raise DomainError("존재하지 않는 방입니다.")
+        raise DomainError("존재하지 않는 방입니다.", 404, include_status=True)
+    if room.started:
+        raise DomainError("이미 시작된 게임입니다.", include_status=True)
     question_numbers = {question.question_number for question in list_questions(session)}
     if question_numbers != set(range(1, 11)):
         raise DomainError("게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다.")
@@ -90,7 +95,7 @@ def start_room(session: Session, room_id: int) -> Room:
 def create_team(session: Session, room_id: int, team_name: str) -> Team:
     room = session.get(Room, room_id)
     if room is None:
-        raise DomainError("존재하지 않는 방입니다.")
+        raise DomainError("존재하지 않는 방입니다.", 404)
     existing = session.scalar(
         select(Team.id).where(Team.room_id == room.id, Team.name == team_name)
     )
@@ -107,13 +112,6 @@ def create_team(session: Session, room_id: int, team_name: str) -> Team:
     except IntegrityError as exc:
         raise DomainError("이미 존재하는 모둠 이름 또는 PIN입니다.") from exc
     return team
-
-
-def join_room(session: Session, room_pin: str, team_name: str) -> Team:
-    room = session.scalar(select(Room).where(Room.pin == room_pin))
-    if room is None:
-        raise DomainError("존재하지 않는 방 PIN입니다.")
-    return create_team(session, room.id, team_name)
 
 
 def authenticate_student(session: Session, team_pin: str, student_number: str) -> Student:
@@ -142,8 +140,30 @@ def authenticate_student(session: Session, team_pin: str, student_number: str) -
 def join_team(session: Session, team_id: int, student_number: str) -> Student:
     team = session.get(Team, team_id)
     if team is None:
-        raise DomainError("존재하지 않는 모둠입니다.")
+        raise DomainError("존재하지 않는 모둠입니다.", 404)
     return authenticate_student(session, team.pin, student_number)
+
+
+def list_room_teams(session: Session, room_id: int) -> list[Team]:
+    if session.get(Room, room_id) is None:
+        raise DomainError("존재하지 않는 방입니다.", 404, include_status=True)
+    return list(session.scalars(select(Team).where(Team.room_id == room_id).order_by(Team.id)))
+
+
+def get_team(session: Session, team_id: int) -> Team:
+    team = session.get(Team, team_id)
+    if team is None:
+        raise DomainError("존재하지 않는 모둠입니다.", 404)
+    return team
+
+
+def get_answer(session: Session, team_id: int, question_id: int) -> Answer:
+    answer = session.scalar(
+        select(Answer).where(Answer.team_id == team_id, Answer.question_id == question_id)
+    )
+    if answer is None:
+        raise DomainError("존재하지 않는 답안입니다.", 404)
+    return answer
 
 
 def _answer_status(answer: Answer | None, question: Question) -> AnswerStatus:
@@ -197,7 +217,7 @@ def _grade_answer(
 def _load_team_for_submission(session: Session, team_id: int) -> Team:
     team = session.scalar(select(Team).where(Team.id == team_id).with_for_update())
     if team is None:
-        raise DomainError("존재하지 않는 모둠입니다.")
+        raise DomainError("존재하지 않는 모둠입니다.", 404)
     if not team.room.started:
         raise DomainError("아직 게임이 시작되지 않았습니다.")
     if team.finished:
@@ -214,7 +234,7 @@ def submit_answer(
     team = _load_team_for_submission(session, team_id)
     question = session.get(Question, question_id)
     if question is None:
-        raise DomainError("존재하지 않는 문제입니다.")
+        raise DomainError("존재하지 않는 문제입니다.", 404)
     answer = session.scalar(
         select(Answer)
         .where(Answer.team_id == team_id, Answer.question_id == question_id)
@@ -285,9 +305,7 @@ def submit_answer_batch(
 
 
 def build_team_progress(session: Session, team_id: int) -> dict:
-    team = session.get(Team, team_id)
-    if team is None:
-        raise DomainError("존재하지 않는 모둠입니다.")
+    team = get_team(session, team_id)
     questions = list_questions(session)
     answers = {
         answer.question_id: answer
@@ -330,7 +348,7 @@ def build_team_progress(session: Session, team_id: int) -> dict:
 def get_ranking(session: Session, room_id: int) -> list[Team]:
     room_exists = session.scalar(select(Room.id).where(Room.id == room_id))
     if room_exists is None:
-        raise DomainError("존재하지 않는 방입니다.")
+        raise DomainError("존재하지 않는 방입니다.", 404)
     return list(
         session.scalars(
             select(Team)

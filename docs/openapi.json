@@ -240,8 +240,17 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Question Questions  Question Id  Delete"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -330,6 +339,55 @@
       }
     },
     "/rooms/{room_id}/teams": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get Room Teams",
+        "operationId": "get_room_teams_rooms__room_id__teams_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Room Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TeamSummaryResponse"
+                  },
+                  "title": "Response Get Room Teams Rooms  Room Id  Teams Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "teams"
@@ -349,64 +407,6 @@
             "schema": {
               "type": "integer",
               "title": "Room Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamJoinRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/rooms/by-pin/{pin}/teams": {
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Create Team By Room Pin",
-        "operationId": "create_team_by_room_pin_rooms_by_pin__pin__teams_post",
-        "deprecated": true,
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "pin",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Pin"
             }
           }
         ],
@@ -547,13 +547,13 @@
         }
       }
     },
-    "/teams/{team_id}/answers/batch": {
-      "post": {
+    "/teams/{team_id}/score": {
+      "get": {
         "tags": [
           "game"
         ],
-        "summary": "Submit Answers Batch",
-        "operationId": "submit_answers_batch_teams__team_id__answers_batch_post",
+        "summary": "Get Team Score",
+        "operationId": "get_team_score_teams__team_id__score_get",
         "security": [
           {
             "HTTPBearer": []
@@ -570,23 +570,60 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BatchAnswerSubmitRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BatchAnswerSubmitResponse"
+                  "$ref": "#/components/schemas/TeamScoreResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team_id}/remaining": {
+      "get": {
+        "tags": [
+          "game"
+        ],
+        "summary": "Get Remaining Questions",
+        "operationId": "get_remaining_questions_teams__team_id__remaining_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemainingQuestionsResponse"
                 }
               }
             }
@@ -605,6 +642,60 @@
       }
     },
     "/teams/{team_id}/answers/{question_id}": {
+      "get": {
+        "tags": [
+          "game"
+        ],
+        "summary": "Get Answer Counts",
+        "operationId": "get_answer_counts_teams__team_id__answers__question_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Question Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerCountsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "game"
@@ -653,7 +744,64 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AnswerResponse"
+                  "$ref": "#/components/schemas/SingleAnswerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{team_id}/answers/batch": {
+      "post": {
+        "tags": [
+          "game"
+        ],
+        "summary": "Submit Answers Batch",
+        "operationId": "submit_answers_batch_teams__team_id__answers_batch_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAnswerSubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchAnswerSubmitResponse"
                 }
               }
             }
@@ -750,20 +898,8 @@
   },
   "components": {
     "schemas": {
-      "AnswerResponse": {
+      "AnswerCountsResponse": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "submittedAnswer": {
-            "type": "string",
-            "title": "Submittedanswer"
-          },
-          "correct": {
-            "type": "boolean",
-            "title": "Correct"
-          },
           "submitCount": {
             "type": "integer",
             "title": "Submitcount"
@@ -771,22 +907,14 @@
           "modifyCount": {
             "type": "integer",
             "title": "Modifycount"
-          },
-          "wrongCount": {
-            "type": "integer",
-            "title": "Wrongcount"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "submittedAnswer",
-          "correct",
           "submitCount",
-          "modifyCount",
-          "wrongCount"
+          "modifyCount"
         ],
-        "title": "AnswerResponse"
+        "title": "AnswerCountsResponse"
       },
       "AnswerStatus": {
         "type": "string",
@@ -1127,6 +1255,19 @@
         ],
         "title": "RankingResponse"
       },
+      "RemainingQuestionsResponse": {
+        "properties": {
+          "remainingCount": {
+            "type": "integer",
+            "title": "Remainingcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "remainingCount"
+        ],
+        "title": "RemainingQuestionsResponse"
+      },
       "RoomResponse": {
         "properties": {
           "id": {
@@ -1149,6 +1290,39 @@
           "started"
         ],
         "title": "RoomResponse"
+      },
+      "SingleAnswerResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "submittedAnswer": {
+            "type": "string",
+            "title": "Submittedanswer"
+          },
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "submitCount": {
+            "type": "integer",
+            "title": "Submitcount"
+          },
+          "modifyCount": {
+            "type": "integer",
+            "title": "Modifycount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "submittedAnswer",
+          "correct",
+          "submitCount",
+          "modifyCount"
+        ],
+        "title": "SingleAnswerResponse"
       },
       "StudentLoginRequest": {
         "properties": {
@@ -1319,6 +1493,47 @@
           "finished"
         ],
         "title": "TeamResponse"
+      },
+      "TeamScoreResponse": {
+        "properties": {
+          "currentCount": {
+            "type": "integer",
+            "title": "Currentcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currentCount"
+        ],
+        "title": "TeamScoreResponse"
+      },
+      "TeamSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "currentCount": {
+            "type": "integer",
+            "title": "Currentcount"
+          },
+          "finished": {
+            "type": "boolean",
+            "title": "Finished"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "currentCount",
+          "finished"
+        ],
+        "title": "TeamSummaryResponse"
       },
       "ValidationError": {
         "properties": {

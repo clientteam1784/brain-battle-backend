@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app import services
@@ -17,7 +17,7 @@ from app.database import get_session
 from app.exceptions import DomainError
 from app.models import Team
 from app.schemas import (
-    AnswerResponse,
+    AnswerCountsResponse,
     AnswerSubmitRequest,
     AuthTokenResponse,
     BatchAnswerSubmitRequest,
@@ -25,13 +25,17 @@ from app.schemas import (
     QuestionRequest,
     QuestionResponse,
     RankingResponse,
+    RemainingQuestionsResponse,
     RoomResponse,
+    SingleAnswerResponse,
     StudentLoginRequest,
     StudentResponse,
     TeacherLoginRequest,
     TeamJoinRequest,
     TeamProgressResponse,
     TeamResponse,
+    TeamScoreResponse,
+    TeamSummaryResponse,
 )
 
 router = APIRouter()
@@ -41,6 +45,13 @@ DbSession = Annotated[Session, Depends(get_session)]
 def _require_own_team(principal: Principal, team_id: int) -> None:
     if principal.team_id != team_id:
         raise DomainError("다른 조의 정보에는 접근할 수 없습니다.", 403)
+
+
+def _require_own_room(session: Session, principal: Principal, room_id: int) -> None:
+    if principal.role == "student":
+        team = session.get(Team, principal.team_id)
+        if team is None or team.room_id != room_id:
+            raise DomainError("다른 방의 정보에는 접근할 수 없습니다.", 403)
 
 
 @router.post("/auth/teacher", response_model=AuthTokenResponse, tags=["auth"])
@@ -117,16 +128,15 @@ def update_question(
 
 @router.delete(
     "/questions/{question_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
     tags=["questions"],
 )
 def delete_question(
     question_id: int,
     session: DbSession,
     _: TeacherPrincipal,
-) -> Response:
+) -> dict:
     services.delete_question(session, question_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return {}
 
 
 @router.post("/rooms", response_model=RoomResponse, tags=["rooms"])
@@ -143,6 +153,18 @@ def start_room(
     return RoomResponse.model_validate(services.start_room(session, room_id))
 
 
+@router.get("/rooms/{room_id}/teams", response_model=list[TeamSummaryResponse], tags=["teams"])
+def get_room_teams(
+    room_id: int,
+    session: DbSession,
+    _: TeacherPrincipal,
+) -> list[TeamSummaryResponse]:
+    return [
+        TeamSummaryResponse.model_validate(team)
+        for team in services.list_room_teams(session, room_id)
+    ]
+
+
 @router.post("/rooms/{room_id}/teams", response_model=TeamResponse, tags=["teams"])
 def create_team(
     room_id: int,
@@ -151,21 +173,6 @@ def create_team(
     _: TeacherPrincipal,
 ) -> TeamResponse:
     return TeamResponse.model_validate(services.create_team(session, room_id, request.team_name))
-
-
-@router.post(
-    "/rooms/by-pin/{pin}/teams",
-    response_model=TeamResponse,
-    tags=["teams"],
-    deprecated=True,
-)
-def create_team_by_room_pin(
-    pin: str,
-    request: TeamJoinRequest,
-    session: DbSession,
-    _: TeacherPrincipal,
-) -> TeamResponse:
-    return TeamResponse.model_validate(services.join_room(session, pin, request.team_name))
 
 
 @router.post("/teams/{team_id}/students", response_model=StudentResponse, tags=["teams"])
@@ -193,6 +200,52 @@ def get_team_progress(
     return TeamProgressResponse.model_validate(services.build_team_progress(session, team_id))
 
 
+@router.get("/teams/{team_id}/score", response_model=TeamScoreResponse, tags=["game"])
+def get_team_score(
+    team_id: int,
+    session: DbSession,
+    principal: CurrentPrincipal,
+) -> TeamScoreResponse:
+    if principal.role == "student":
+        _require_own_team(principal, team_id)
+    team = services.get_team(session, team_id)
+    return TeamScoreResponse(currentCount=team.current_count)
+
+
+@router.get(
+    "/teams/{team_id}/remaining",
+    response_model=RemainingQuestionsResponse,
+    tags=["game"],
+)
+def get_remaining_questions(
+    team_id: int,
+    session: DbSession,
+    principal: CurrentPrincipal,
+) -> RemainingQuestionsResponse:
+    if principal.role == "student":
+        _require_own_team(principal, team_id)
+    team = services.get_team(session, team_id)
+    return RemainingQuestionsResponse(
+        remainingCount=max(len(services.list_questions(session)) - team.current_count, 0)
+    )
+
+
+@router.get(
+    "/teams/{team_id}/answers/{question_id}",
+    response_model=AnswerCountsResponse,
+    tags=["game"],
+)
+def get_answer_counts(
+    team_id: int,
+    question_id: int,
+    session: DbSession,
+    principal: CurrentPrincipal,
+) -> AnswerCountsResponse:
+    if principal.role == "student":
+        _require_own_team(principal, team_id)
+    return AnswerCountsResponse.model_validate(services.get_answer(session, team_id, question_id))
+
+
 @router.post(
     "/teams/{team_id}/answers/batch",
     response_model=BatchAnswerSubmitResponse,
@@ -211,7 +264,7 @@ def submit_answers_batch(
 
 @router.post(
     "/teams/{team_id}/answers/{question_id}",
-    response_model=AnswerResponse,
+    response_model=SingleAnswerResponse,
     tags=["game"],
     deprecated=True,
 )
@@ -221,9 +274,9 @@ def submit_answer(
     request: AnswerSubmitRequest,
     session: DbSession,
     principal: StudentPrincipal,
-) -> AnswerResponse:
+) -> SingleAnswerResponse:
     _require_own_team(principal, team_id)
-    return AnswerResponse.model_validate(
+    return SingleAnswerResponse.model_validate(
         services.submit_answer(
             session,
             team_id,
@@ -239,10 +292,7 @@ def get_ranking(
     session: DbSession,
     principal: CurrentPrincipal,
 ) -> list[RankingResponse]:
-    if principal.role == "student":
-        team = session.get(Team, principal.team_id)
-        if team is None or team.room_id != room_id:
-            raise DomainError("다른 방의 순위에는 접근할 수 없습니다.", 403)
+    _require_own_room(session, principal, room_id)
     teams = services.get_ranking(session, room_id)
     return [
         RankingResponse(

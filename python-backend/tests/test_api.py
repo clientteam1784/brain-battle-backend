@@ -107,7 +107,26 @@ def test_question_crud_and_validation_contract(client: TestClient) -> None:
         json={"questionNumber": 0, "answer": "", "maxSubmitCount": 0},
     )
     assert invalid.status_code == 400
-    assert invalid.json() == {"message": "문제 번호는 1 이상이어야 합니다."}
+    assert invalid.json() == {"status": 400, "message": "문제 번호는 1 이상이어야 합니다."}
+
+    missing_answer = client.post(
+        "/questions",
+        headers=headers,
+        json={"questionNumber": 3, "answer": " ", "maxSubmitCount": 2},
+    )
+    assert missing_answer.status_code == 400
+    assert missing_answer.json() == {"status": 400, "message": "정답은 필수입니다."}
+
+    invalid_limit = client.post(
+        "/questions",
+        headers=headers,
+        json={"questionNumber": 3, "answer": "정답", "maxSubmitCount": 0},
+    )
+    assert invalid_limit.status_code == 400
+    assert invalid_limit.json() == {
+        "status": 400,
+        "message": "최대 제출 횟수는 1 이상이어야 합니다.",
+    }
 
     updated = client.patch(
         f"/questions/{question['id']}",
@@ -119,7 +138,12 @@ def test_question_crud_and_validation_contract(client: TestClient) -> None:
 
     listed = client.get("/questions", headers=headers)
     assert listed.json() == [{"id": 1, "questionNumber": 1, "maxSubmitCount": 3}]
-    assert client.delete(f"/questions/{question['id']}", headers=headers).status_code == 204
+    deleted = client.delete(f"/questions/{question['id']}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json() == {}
+    missing_question = client.delete(f"/questions/{question['id']}", headers=headers)
+    assert missing_question.status_code == 404
+    assert missing_question.json() == {"status": 404, "message": "존재하지 않는 문제입니다."}
 
 
 def test_room_requires_exactly_ten_questions_to_start(client: TestClient) -> None:
@@ -154,6 +178,71 @@ def test_team_pin_login_and_duplicate_team(client: TestClient) -> None:
     assert token.json()["role"] == "student"
     assert token.json()["teamId"] == team["id"]
     assert token.json()["studentId"] == 1
+
+
+def test_specified_summary_endpoints_and_errors(client: TestClient) -> None:
+    teacher = teacher_headers(client)
+    questions = create_ten_questions(client, teacher)
+    room, team = create_team(client, teacher)
+    other_room, other_team = create_team(client, teacher, "다른 방 모둠")
+
+    teams = client.get(f"/rooms/{room['id']}/teams", headers=teacher)
+    assert teams.status_code == 200
+    assert teams.json() == [
+        {"id": team["id"], "name": team["name"], "currentCount": 0, "finished": False}
+    ]
+    missing_room = client.get("/rooms/999/teams", headers=teacher)
+    assert missing_room.status_code == 404
+    assert missing_room.json() == {"status": 404, "message": "존재하지 않는 방입니다."}
+    missing_start = client.patch("/rooms/999/start", headers=teacher)
+    assert missing_start.status_code == 404
+    assert missing_start.json() == {"status": 404, "message": "존재하지 않는 방입니다."}
+
+    start_room(client, teacher, room["id"])
+    started_again = client.patch(f"/rooms/{room['id']}/start", headers=teacher)
+    assert started_again.status_code == 400
+    assert started_again.json() == {"status": 400, "message": "이미 시작된 게임입니다."}
+
+    student = student_headers(client, team["pin"])
+    assert client.get(f"/teams/{team['id']}/score", headers=student).json() == {"currentCount": 0}
+    assert client.get(f"/teams/{team['id']}/remaining", headers=student).json() == {
+        "remainingCount": 10
+    }
+    assert (
+        client.get(f"/teams/{team['id']}/answers/{questions[0]['id']}", headers=student).status_code
+        == 404
+    )
+
+    submitted = client.post(
+        f"/teams/{team['id']}/answers/{questions[0]['id']}",
+        headers=student,
+        json={"submittedAnswer": "틀림"},
+    )
+    assert submitted.status_code == 200
+    assert client.get(
+        f"/teams/{team['id']}/answers/{questions[0]['id']}", headers=student
+    ).json() == {
+        "submitCount": 1,
+        "modifyCount": 0,
+    }
+    corrected = client.post(
+        f"/teams/{team['id']}/answers/{questions[0]['id']}",
+        headers=student,
+        json={"submittedAnswer": "정답1"},
+    )
+    assert corrected.status_code == 200
+    assert client.get(
+        f"/teams/{team['id']}/answers/{questions[0]['id']}", headers=student
+    ).json() == {
+        "submitCount": 2,
+        "modifyCount": 1,
+    }
+    assert client.get(f"/teams/{team['id']}/score", headers=student).json() == {"currentCount": 1}
+    assert client.get(f"/teams/{team['id']}/remaining", headers=student).json() == {
+        "remainingCount": 9
+    }
+    assert client.get(f"/teams/{other_team['id']}/score", headers=student).status_code == 403
+    assert client.get(f"/rooms/{other_room['id']}/ranking", headers=student).status_code == 403
 
 
 def test_batch_grading_distinguishes_unsubmitted_wrong_and_exhausted(
