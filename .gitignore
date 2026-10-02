@@ -1,4 +1,7 @@
 .idea/
+.env
+.env.*
+!.env.example
 .vscode/
 .pytest_cache/
 .ruff_cache/
