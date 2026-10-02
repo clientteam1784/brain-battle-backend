@@ -4,6 +4,15 @@ Brain Battle의 FastAPI, SQLAlchemy 2.x, Alembic 백엔드입니다.
 기존 `clientteam1784/brain-battle`에서 백엔드 코드와 커밋 기록을 이전했습니다.
 프론트엔드는 별도 저장소 [brain-battle-frontend](https://github.com/clientteam1784/brain-battle-frontend)에서 개발합니다.
 
+## API documentation
+
+- **[전체 API 명세서](docs/API_SPEC.md)**: 구현된 19개 API의 권한, request/response, 오류 응답
+- [프론트엔드 연동 가이드](docs/FRONTEND_API_GUIDE.md): 모둠 PIN 입장, 일괄 제출, 로테이션 화면 흐름
+- [OpenAPI JSON](docs/openapi.json): 필드 자료형·필수 여부와 기계 판독 계약
+
+모둠 생성은 선생님이 하고 학생은 모둠 PIN으로 로그인합니다. 새로운 답안 화면은
+10문항을 입력한 뒤 단일 제출 버튼에서 일괄 채점 API를 사용합니다.
+
 ## Project structure
 
 - `app/`: API, 인증, 데이터 모델, 채점 로직
@@ -11,6 +20,7 @@ Brain Battle의 FastAPI, SQLAlchemy 2.x, Alembic 백엔드입니다.
 - `tests/`: API 및 게임 흐름 테스트
 - `scripts/`: OpenAPI 명세 생성
 - `.github/workflows/`: 자동 검사 설정
+- `docs/API_SPEC.md`: 전체 백엔드 API 명세
 - `docs/FRONTEND_API_GUIDE.md`: 프론트엔드 연동 가이드
 - `docs/openapi.json`: 정적 OpenAPI 계약
 

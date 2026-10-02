@@ -1,11 +1,14 @@
 # Brain Battle 프론트엔드 API 가이드
 
+모든 API의 요청·응답·오류를 확인하려면 [전체 API 명세서](./API_SPEC.md)를 참고합니다.
+이 문서는 프론트 화면을 연결하는 순서와 제출 흐름을 설명합니다.
+
 현재 `main` 브랜치의 Python/FastAPI 백엔드 계약입니다. 로컬 API 주소는
 `http://localhost:8000`이고 Swagger UI는 `/docs`에서 볼 수 있습니다.
 
 ## 공통 규칙
 
-- 로그인 이외의 모든 API는 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
+- `/health`와 로그인 API 이외의 모든 API는 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
 - 교사 전용 API를 학생 토큰으로 호출하면 `403`, 토큰이 없거나 유효하지 않으면 `401`입니다.
 - PIN과 학번은 앞자리 0 보존을 위해 항상 문자열로 처리합니다.
 - 오류 응답은 보통 `{"message": "오류 내용"}` 형식입니다. 문제 관리, 게임 시작,
@@ -172,6 +175,9 @@ Enter 입력과 문항 번호 클릭은 프론트엔드의 현재 문항 인덱�
 GET /teams/7/progress
 Authorization: Bearer {studentToken}
 ```
+
+아래 JSON은 `questions` 중 한 문항만 보여 주는 발췌 예시입니다. 실제 응답에는 모든
+등록 문항이 포함되며, 전체 응답 예시는 [API 명세서](./API_SPEC.md#풀이-상태와-조회)에 있습니다.
 
 ```json
 {
