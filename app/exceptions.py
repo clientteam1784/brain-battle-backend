@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
+# 서비스 규칙 위반을 HTTP 응답으로 일관되게 바꾸기 위한 애플리케이션 예외입니다.
 class DomainError(Exception):
     def __init__(
         self,
@@ -17,6 +18,7 @@ class DomainError(Exception):
         self.include_status = include_status
 
 
+# Pydantic의 내부 오류 표현을 프론트엔드가 표시하기 쉬운 한국어 메시지로 정리합니다.
 def _validation_message(error: dict) -> str:
     field = error.get("loc", [""])[-1]
     if error.get("type") == "greater_than_equal":
@@ -31,6 +33,7 @@ def _validation_message(error: dict) -> str:
     return error.get("msg", "잘못된 요청입니다.")
 
 
+# 도메인 오류와 요청 형식 오류의 응답 형식을 앱 전체에 등록합니다.
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
