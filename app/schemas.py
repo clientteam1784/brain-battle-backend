@@ -4,6 +4,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# API 입력과 출력에서 공통으로 쓰는 설정: camelCase 별칭과 ORM 객체 변환을 허용합니다.
 class ApiModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
@@ -116,6 +117,7 @@ class AnswerCountsResponse(ApiModel):
     modify_count: int = Field(alias="modifyCount")
 
 
+# 프론트엔드가 문항별 진행 상태를 구분하는 값입니다.
 class AnswerStatus(StrEnum):
     UNSUBMITTED = "UNSUBMITTED"
     WRONG = "WRONG"
@@ -128,6 +130,7 @@ class BatchAnswerItem(ApiModel):
     submitted_answer: str | None = Field(default=None, alias="submittedAnswer")
 
 
+# 여러 답안을 한 번에 받으며, 한 요청에 같은 문제 ID가 두 번 오지 않게 검사합니다.
 class BatchAnswerSubmitRequest(ApiModel):
     answers: list[BatchAnswerItem] = Field(default_factory=list, max_length=10)
 
@@ -151,6 +154,7 @@ class QuestionProgressResponse(ApiModel):
     locked: bool
 
 
+# 게임 화면이 필요한 조 진행 상황과 다음에 풀 문항을 한 응답으로 제공합니다.
 class TeamProgressResponse(ApiModel):
     team_id: int = Field(alias="teamId")
     submission_round: int = Field(alias="submissionRound")
