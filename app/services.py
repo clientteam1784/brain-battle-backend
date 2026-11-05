@@ -60,6 +60,7 @@ def delete_question(session: Session, question_id: int) -> None:
     session.delete(question)
 
 
+# PIN 충돌 가능성을 고려해 최대 30회 새 번호를 시도합니다. DB 유니크 제약도 최종 방어선입니다.
 def _unique_pin(session: Session, model: type[Room] | type[Team], label: str) -> str:
     for _ in range(30):
         pin = str(100000 + secrets.randbelow(900000))
@@ -78,6 +79,7 @@ def create_room(session: Session) -> Room:
     return room
 
 
+# 시작 전에 정확히 1~10번 문제 세트가 준비됐는지 확인합니다.
 def start_room(session: Session, room_id: int) -> Room:
     room = session.get(Room, room_id)
     if room is None:
@@ -166,6 +168,7 @@ def get_answer(session: Session, team_id: int, question_id: int) -> Answer:
     return answer
 
 
+# 정답/횟수 제한 여부로 문항을 더 제출할 수 있는지 판단합니다.
 def _answer_status(answer: Answer | None, question: Question) -> AnswerStatus:
     if answer is None:
         return AnswerStatus.UNSUBMITTED
@@ -176,6 +179,7 @@ def _answer_status(answer: Answer | None, question: Question) -> AnswerStatus:
     return AnswerStatus.WRONG
 
 
+# 빈 입력은 건너뛰고, 잠긴 문항은 바꾸지 않으며, 새 답 또는 수정 답을 채점합니다.
 def _grade_answer(
     session: Session,
     team: Team,
@@ -214,6 +218,7 @@ def _grade_answer(
     return answer, True
 
 
+# 동시 제출 때 진행 상태가 꼬이지 않도록 조 행을 잠근 뒤 제출 가능한지 확인합니다.
 def _load_team_for_submission(session: Session, team_id: int) -> Team:
     team = session.scalar(select(Team).where(Team.id == team_id).with_for_update())
     if team is None:
@@ -251,6 +256,7 @@ def submit_answer(
     return graded
 
 
+# 정답 개수를 다시 계산하고 모든 문항을 맞힌 최초 시각을 기록합니다.
 def _refresh_team_completion(session: Session, team: Team) -> None:
     questions = list_questions(session)
     answers = list(session.scalars(select(Answer).where(Answer.team_id == team.id)))
@@ -260,6 +266,7 @@ def _refresh_team_completion(session: Session, team: Team) -> None:
         team.finished_at = team.finished_at or datetime.now()
 
 
+# 묶음 제출의 문항 검증, 채점, 라운드 증가, 완료 갱신을 한 트랜잭션에서 처리합니다.
 def submit_answer_batch(
     session: Session,
     team_id: int,
@@ -304,6 +311,7 @@ def submit_answer_batch(
     return build_team_progress(session, team.id), graded_count
 
 
+# 문항별 상태와 잠금 여부, 순환 출제 목록을 프론트엔드용 응답으로 구성합니다.
 def build_team_progress(session: Session, team_id: int) -> dict:
     team = get_team(session, team_id)
     questions = list_questions(session)
@@ -345,6 +353,7 @@ def build_team_progress(session: Session, team_id: int) -> dict:
     }
 
 
+# 완료한 조 우선, 완료 시각, 정답 수, 조 ID 순으로 순위를 안정적으로 정렬합니다.
 def get_ranking(session: Session, room_id: int) -> list[Team]:
     room_exists = session.scalar(select(Room.id).where(Room.id == room_id))
     if room_exists is None:
