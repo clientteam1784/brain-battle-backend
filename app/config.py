@@ -4,6 +4,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# 환경 변수 또는 .env에서 읽는 실행 설정입니다. 기본값은 로컬 개발용입니다.
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = (
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     )
 
 
+# 설정 객체를 한 번만 읽어 앱 전체가 동일한 환경 설정을 사용하도록 합니다.
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
