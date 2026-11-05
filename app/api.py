@@ -38,15 +38,18 @@ from app.schemas import (
     TeamSummaryResponse,
 )
 
+# HTTP 요청을 받아 서비스 로직을 호출하고, 결과를 응답 스키마로 바꾸는 API 경계입니다.
 router = APIRouter()
 DbSession = Annotated[Session, Depends(get_session)]
 
 
+# 학생 토큰에 담긴 조 ID와 요청 경로의 조 ID를 비교해 다른 조의 정보 접근을 막습니다.
 def _require_own_team(principal: Principal, team_id: int) -> None:
     if principal.team_id != team_id:
         raise DomainError("다른 조의 정보에는 접근할 수 없습니다.", 403)
 
 
+# 학생은 자신이 속한 조가 있는 방의 순위만 볼 수 있습니다.
 def _require_own_room(session: Session, principal: Principal, room_id: int) -> None:
     if principal.role == "student":
         team = session.get(Team, principal.team_id)
@@ -85,6 +88,7 @@ def login_student(request: StudentLoginRequest, session: DbSession) -> AuthToken
     )
 
 
+# 문제 관리는 교사 전용입니다. 인증 의존성이 역할을 먼저 검사합니다.
 @router.post("/questions", response_model=QuestionResponse, tags=["questions"])
 def create_question(
     request: QuestionRequest,
@@ -139,6 +143,7 @@ def delete_question(
     return {}
 
 
+# 방과 조 구성은 교사가 관리하고, 게임 진행 조회와 답안 제출은 학생도 사용합니다.
 @router.post("/rooms", response_model=RoomResponse, tags=["rooms"])
 def create_room(session: DbSession, _: TeacherPrincipal) -> RoomResponse:
     return RoomResponse.model_validate(services.create_room(session))
@@ -246,6 +251,7 @@ def get_answer_counts(
     return AnswerCountsResponse.model_validate(services.get_answer(session, team_id, question_id))
 
 
+# 현재 프론트엔드의 기본 제출 경로입니다. 한 번의 요청에서 여러 문항을 채점합니다.
 @router.post(
     "/teams/{team_id}/answers/batch",
     response_model=BatchAnswerSubmitResponse,
@@ -262,6 +268,7 @@ def submit_answers_batch(
     return BatchAnswerSubmitResponse.model_validate({**progress, "gradedCount": graded_count})
 
 
+# 이전 단일 답안 API와의 호환을 위해 남겨 둔 경로입니다.
 @router.post(
     "/teams/{team_id}/answers/{question_id}",
     response_model=SingleAnswerResponse,
