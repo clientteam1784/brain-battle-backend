@@ -58,6 +58,7 @@ def _require_own_room(session: Session, principal: Principal, room_id: int) -> N
 
 
 @router.post("/auth/teacher", response_model=AuthTokenResponse, tags=["auth"])
+# 교사 인증 코드를 비교하고, 성공하면 교사용 JWT를 발급합니다.
 def login_teacher(request: TeacherLoginRequest) -> AuthTokenResponse:
     if not secrets.compare_digest(request.access_code, get_settings().teacher_access_code):
         raise DomainError("선생님 인증 코드가 올바르지 않습니다.", 401)
@@ -71,6 +72,7 @@ def login_teacher(request: TeacherLoginRequest) -> AuthTokenResponse:
 
 
 @router.post("/auth/student", response_model=AuthTokenResponse, tags=["auth"])
+# 조 PIN과 학번으로 학생을 찾거나 등록한 뒤, 조 범위가 담긴 JWT를 발급합니다.
 def login_student(request: StudentLoginRequest, session: DbSession) -> AuthTokenResponse:
     student = services.authenticate_student(
         session,
@@ -105,6 +107,7 @@ def create_question(
 
 
 @router.get("/questions", response_model=list[QuestionResponse], tags=["questions"])
+# 로그인한 사용자에게 문제 목록을 문제 번호 순서로 반환합니다.
 def get_questions(session: DbSession, _: CurrentPrincipal) -> list[QuestionResponse]:
     return [QuestionResponse.model_validate(item) for item in services.list_questions(session)]
 
@@ -114,6 +117,7 @@ def get_questions(session: DbSession, _: CurrentPrincipal) -> list[QuestionRespo
     response_model=QuestionResponse,
     tags=["questions"],
 )
+# 교사가 기존 문제의 번호, 정답, 제출 가능 횟수를 변경합니다.
 def update_question(
     question_id: int,
     request: QuestionRequest,
@@ -134,6 +138,7 @@ def update_question(
     "/questions/{question_id}",
     tags=["questions"],
 )
+# 교사가 문제를 삭제합니다. 연결된 답안은 DB 외래 키 정책에 따라 함께 삭제됩니다.
 def delete_question(
     question_id: int,
     session: DbSession,
@@ -145,11 +150,13 @@ def delete_question(
 
 # 방과 조 구성은 교사가 관리하고, 게임 진행 조회와 답안 제출은 학생도 사용합니다.
 @router.post("/rooms", response_model=RoomResponse, tags=["rooms"])
+# 교사가 새 게임 방을 만들고 참가용 PIN을 받습니다.
 def create_room(session: DbSession, _: TeacherPrincipal) -> RoomResponse:
     return RoomResponse.model_validate(services.create_room(session))
 
 
 @router.patch("/rooms/{room_id}/start", response_model=RoomResponse, tags=["rooms"])
+# 등록된 문제 세트를 검증한 뒤 교사가 게임을 시작합니다.
 def start_room(
     room_id: int,
     session: DbSession,
@@ -171,6 +178,7 @@ def get_room_teams(
 
 
 @router.post("/rooms/{room_id}/teams", response_model=TeamResponse, tags=["teams"])
+# 교사가 방 안에 새 모둠을 만들고 학생용 PIN을 발급합니다.
 def create_team(
     room_id: int,
     request: TeamJoinRequest,
@@ -181,6 +189,7 @@ def create_team(
 
 
 @router.post("/teams/{team_id}/students", response_model=StudentResponse, tags=["teams"])
+# 교사가 지정한 모둠에 학번을 등록합니다.
 def join_team(
     team_id: int,
     session: DbSession,
@@ -195,6 +204,7 @@ def join_team(
     response_model=TeamProgressResponse,
     tags=["game"],
 )
+# 문항별 정답 여부와 다음 제출 대상 등 게임 진행 정보를 반환합니다.
 def get_team_progress(
     team_id: int,
     session: DbSession,
@@ -206,6 +216,7 @@ def get_team_progress(
 
 
 @router.get("/teams/{team_id}/score", response_model=TeamScoreResponse, tags=["game"])
+# 해당 모둠의 현재 정답 개수를 반환합니다.
 def get_team_score(
     team_id: int,
     session: DbSession,
@@ -222,6 +233,7 @@ def get_team_score(
     response_model=RemainingQuestionsResponse,
     tags=["game"],
 )
+# 전체 문제 수에서 정답 처리된 수를 빼 남은 문제 수를 계산합니다.
 def get_remaining_questions(
     team_id: int,
     session: DbSession,
@@ -240,6 +252,7 @@ def get_remaining_questions(
     response_model=AnswerCountsResponse,
     tags=["game"],
 )
+# 특정 모둠과 문제 조합의 제출 및 수정 횟수를 조회합니다.
 def get_answer_counts(
     team_id: int,
     question_id: int,
@@ -257,6 +270,7 @@ def get_answer_counts(
     response_model=BatchAnswerSubmitResponse,
     tags=["game"],
 )
+# 학생이 제출한 답안 묶음을 채점하고 최신 진행 상황을 반환합니다.
 def submit_answers_batch(
     team_id: int,
     request: BatchAnswerSubmitRequest,
@@ -275,6 +289,7 @@ def submit_answers_batch(
     tags=["game"],
     deprecated=True,
 )
+# 이전 버전 클라이언트용 단일 문항 제출 API입니다.
 def submit_answer(
     team_id: int,
     question_id: int,
@@ -294,6 +309,7 @@ def submit_answer(
 
 
 @router.get("/rooms/{room_id}/ranking", response_model=list[RankingResponse], tags=["rooms"])
+# 방의 모둠을 순위로 바꾸고 순번을 붙여 반환합니다.
 def get_ranking(
     room_id: int,
     session: DbSession,
