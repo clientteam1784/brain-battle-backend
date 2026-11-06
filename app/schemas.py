@@ -9,6 +9,7 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
+# 교사가 문제를 만들거나 수정할 때 보내는 입력 형식입니다.
 class QuestionRequest(ApiModel):
     question_number: int = Field(alias="questionNumber", ge=1)
     answer: str
@@ -43,6 +44,7 @@ class StudentLoginRequest(ApiModel):
     student_number: str = Field(alias="studentNumber", min_length=1)
 
 
+# 로그인 성공 시 클라이언트에 전달하는 토큰과 사용자 식별 정보입니다.
 class AuthTokenResponse(ApiModel):
     access_token: str = Field(alias="accessToken")
     token_type: str = Field(default="bearer", alias="tokenType")
@@ -52,6 +54,7 @@ class AuthTokenResponse(ApiModel):
     team_id: int | None = Field(default=None, alias="teamId")
 
 
+# 모둠 생성 요청의 이름을 검증하고 앞뒤 공백을 제거합니다.
 class TeamJoinRequest(ApiModel):
     team_name: str = Field(alias="teamName")
 
@@ -85,6 +88,7 @@ class StudentResponse(ApiModel):
     team_id: int = Field(alias="teamId")
 
 
+# 구형 단일 답안 제출 API의 요청 형식입니다.
 class AnswerSubmitRequest(ApiModel):
     submitted_answer: str = Field(alias="submittedAnswer")
 
@@ -125,6 +129,7 @@ class AnswerStatus(StrEnum):
     EXHAUSTED = "EXHAUSTED"
 
 
+# 묶음 제출에서 한 문제의 ID와 학생 답을 표현합니다.
 class BatchAnswerItem(ApiModel):
     question_id: int = Field(alias="questionId", ge=1)
     submitted_answer: str | None = Field(default=None, alias="submittedAnswer")
@@ -142,6 +147,7 @@ class BatchAnswerSubmitRequest(ApiModel):
         return self
 
 
+# 진행 조회 응답에서 한 문항의 상태와 남은 기회를 표현합니다.
 class QuestionProgressResponse(ApiModel):
     question_id: int = Field(alias="questionId")
     question_number: int = Field(alias="questionNumber")
@@ -170,6 +176,7 @@ class BatchAnswerSubmitResponse(TeamProgressResponse):
     graded_count: int = Field(alias="gradedCount")
 
 
+# 순위표의 한 행에 필요한 모둠 정보를 표현합니다.
 class RankingResponse(ApiModel):
     rank: int
     team_name: str = Field(alias="teamName")
