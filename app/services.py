@@ -10,6 +10,7 @@ from app.models import Answer, Question, Room, Student, Team
 from app.schemas import AnswerStatus, BatchAnswerItem
 
 
+# 문제를 저장합니다. 중복 문제 번호는 DB 제약 오류를 사용자용 도메인 오류로 바꿉니다.
 def create_question(
     session: Session,
     question_number: int,
@@ -29,10 +30,12 @@ def create_question(
     return question
 
 
+# 모든 문제를 번호 오름차순으로 읽습니다.
 def list_questions(session: Session) -> list[Question]:
     return list(session.scalars(select(Question).order_by(Question.question_number)))
 
 
+# 문제를 찾아 변경하고, 존재하지 않거나 번호가 겹치면 오류를 반환합니다.
 def update_question(
     session: Session,
     question_id: int,
@@ -53,6 +56,7 @@ def update_question(
     return question
 
 
+# 문제를 찾아 삭제합니다. 없으면 404 도메인 오류를 발생시킵니다.
 def delete_question(session: Session, question_id: int) -> None:
     question = session.get(Question, question_id)
     if question is None:
@@ -69,6 +73,7 @@ def _unique_pin(session: Session, model: type[Room] | type[Team], label: str) ->
     raise DomainError(f"{label} PIN을 생성하지 못했습니다. 다시 시도해주세요.", 503)
 
 
+# 충돌하지 않는 방 PIN을 만들고 새 방 레코드를 저장합니다.
 def create_room(session: Session) -> Room:
     try:
         room = Room(pin=_unique_pin(session, Room, "방"))
@@ -94,6 +99,7 @@ def start_room(session: Session, room_id: int) -> Room:
     return room
 
 
+# 방을 확인하고 이름 중복을 막은 뒤 PIN이 있는 모둠을 생성합니다.
 def create_team(session: Session, room_id: int, team_name: str) -> Team:
     room = session.get(Room, room_id)
     if room is None:
@@ -116,6 +122,7 @@ def create_team(session: Session, room_id: int, team_name: str) -> Team:
     return team
 
 
+# 조 PIN과 학번을 확인합니다. 첫 로그인 학번은 해당 조 학생으로 등록합니다.
 def authenticate_student(session: Session, team_pin: str, student_number: str) -> Student:
     team = session.scalar(select(Team).where(Team.pin == team_pin))
     if team is None:
@@ -139,6 +146,7 @@ def authenticate_student(session: Session, team_pin: str, student_number: str) -
     return student
 
 
+# 모둠 ID로 모둠 PIN을 찾은 뒤 공통 학생 인증 흐름을 재사용합니다.
 def join_team(session: Session, team_id: int, student_number: str) -> Student:
     team = session.get(Team, team_id)
     if team is None:
@@ -146,12 +154,14 @@ def join_team(session: Session, team_id: int, student_number: str) -> Student:
     return authenticate_student(session, team.pin, student_number)
 
 
+# 방 존재를 확인하고 그 방의 모둠을 ID 순으로 가져옵니다.
 def list_room_teams(session: Session, room_id: int) -> list[Team]:
     if session.get(Room, room_id) is None:
         raise DomainError("존재하지 않는 방입니다.", 404, include_status=True)
     return list(session.scalars(select(Team).where(Team.room_id == room_id).order_by(Team.id)))
 
 
+# 모둠을 ID로 조회하고 없으면 404 오류를 발생시킵니다.
 def get_team(session: Session, team_id: int) -> Team:
     team = session.get(Team, team_id)
     if team is None:
@@ -159,6 +169,7 @@ def get_team(session: Session, team_id: int) -> Team:
     return team
 
 
+# 모둠과 문제에 해당하는 답안을 조회합니다.
 def get_answer(session: Session, team_id: int, question_id: int) -> Answer:
     answer = session.scalar(
         select(Answer).where(Answer.team_id == team_id, Answer.question_id == question_id)
@@ -230,6 +241,7 @@ def _load_team_for_submission(session: Session, team_id: int) -> Team:
     return team
 
 
+# 한 문항 답안을 잠금·횟수 제한 규칙에 따라 채점하고 완료 여부를 갱신합니다.
 def submit_answer(
     session: Session,
     team_id: int,
