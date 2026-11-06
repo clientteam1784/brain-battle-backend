@@ -12,6 +12,7 @@ PrimaryKey = Annotated[int, mapped_column(id_type, primary_key=True, autoincreme
 
 
 # 한 번의 게임 공간입니다. PIN은 참가 코드이고 started는 게임 시작 여부입니다.
+# 한 번의 게임 세션을 나타냅니다. teams 관계로 이 방의 모둠을 탐색할 수 있습니다.
 class Room(Base):
     __tablename__ = "room"
     __table_args__ = (UniqueConstraint("pin", name="uq_room_pin"),)
@@ -24,6 +25,7 @@ class Room(Base):
 
 
 # 방 안의 모둠과 진행 상태를 저장합니다. PIN은 학생 로그인에 사용됩니다.
+# 방에 속한 모둠과 점수, 제출 회차, 완료 시각을 저장합니다.
 class Team(Base):
     __tablename__ = "team"
     __table_args__ = (
@@ -50,6 +52,7 @@ class Team(Base):
 
 
 # 조별 학번을 저장합니다. 같은 조 안에서 학번은 중복될 수 없습니다.
+# 학생의 학번과 소속 모둠을 저장합니다.
 class Student(Base):
     __tablename__ = "student"
     __table_args__ = (UniqueConstraint("team_id", "student_number", name="uq_student_team_number"),)
@@ -66,6 +69,7 @@ class Student(Base):
 
 
 # 교사가 등록하는 문제와 정답, 허용 제출 횟수입니다.
+# 문제 번호, 정답, 최대 제출 횟수를 저장합니다.
 class Question(Base):
     __tablename__ = "question"
     __table_args__ = (UniqueConstraint("question_number", name="uq_question_number"),)
@@ -79,6 +83,7 @@ class Question(Base):
 
 
 # 조가 문항에 제출한 최신 답과 채점/시도 횟수를 저장합니다.
+# 모둠이 특정 문제에 낸 최신 답과 채점/시도 횟수를 저장합니다.
 class Answer(Base):
     __tablename__ = "answer"
     __table_args__ = (UniqueConstraint("team_id", "question_id", name="uq_answer_team_question"),)
