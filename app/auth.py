@@ -76,6 +76,7 @@ def require_teacher(principal: CurrentPrincipal) -> Principal:
     return principal
 
 
+# 학생 역할만 허용하는 FastAPI 의존성입니다.
 def require_student(principal: CurrentPrincipal) -> Principal:
     if principal.role != "student":
         raise DomainError("학생 권한이 필요합니다.", 403)
