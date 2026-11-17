@@ -87,6 +87,7 @@ def login_student(request: StudentLoginRequest, session: DbSession) -> AuthToken
         expiresIn=expires_in,
         studentId=student.id,
         teamId=student.team_id,
+        roomId=student.team.room_id,
     )
 
 
@@ -320,6 +321,7 @@ def get_ranking(
     return [
         RankingResponse(
             rank=index,
+            teamId=team.id,
             teamName=team.name,
             currentCount=team.current_count,
             finished=team.finished,

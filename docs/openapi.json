@@ -979,6 +979,17 @@
               }
             ],
             "title": "Teamid"
+          },
+          "roomId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roomid"
           }
         },
         "type": "object",
@@ -1034,6 +1045,10 @@
             "type": "integer",
             "title": "Teamid"
           },
+          "roomStarted": {
+            "type": "boolean",
+            "title": "Roomstarted"
+          },
           "submissionRound": {
             "type": "integer",
             "title": "Submissionround"
@@ -1083,6 +1098,7 @@
         "type": "object",
         "required": [
           "teamId",
+          "roomStarted",
           "submissionRound",
           "correctCount",
           "totalQuestions",
@@ -1220,6 +1236,10 @@
             "type": "integer",
             "title": "Rank"
           },
+          "teamId": {
+            "type": "integer",
+            "title": "Teamid"
+          },
           "teamName": {
             "type": "string",
             "title": "Teamname"
@@ -1248,6 +1268,7 @@
         "type": "object",
         "required": [
           "rank",
+          "teamId",
           "teamName",
           "currentCount",
           "finished",
@@ -1401,6 +1422,10 @@
             "type": "integer",
             "title": "Teamid"
           },
+          "roomStarted": {
+            "type": "boolean",
+            "title": "Roomstarted"
+          },
           "submissionRound": {
             "type": "integer",
             "title": "Submissionround"
@@ -1446,6 +1471,7 @@
         "type": "object",
         "required": [
           "teamId",
+          "roomStarted",
           "submissionRound",
           "correctCount",
           "totalQuestions",

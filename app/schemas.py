@@ -52,6 +52,7 @@ class AuthTokenResponse(ApiModel):
     expires_in: int = Field(alias="expiresIn")
     student_id: int | None = Field(default=None, alias="studentId")
     team_id: int | None = Field(default=None, alias="teamId")
+    room_id: int | None = Field(default=None, alias="roomId")
 
 
 # 모둠 생성 요청의 이름을 검증하고 앞뒤 공백을 제거합니다.
@@ -163,6 +164,7 @@ class QuestionProgressResponse(ApiModel):
 # 게임 화면이 필요한 조 진행 상황과 다음에 풀 문항을 한 응답으로 제공합니다.
 class TeamProgressResponse(ApiModel):
     team_id: int = Field(alias="teamId")
+    room_started: bool = Field(alias="roomStarted")
     submission_round: int = Field(alias="submissionRound")
     correct_count: int = Field(alias="correctCount")
     total_questions: int = Field(alias="totalQuestions")
@@ -179,6 +181,7 @@ class BatchAnswerSubmitResponse(TeamProgressResponse):
 # 순위표의 한 행에 필요한 모둠 정보를 표현합니다.
 class RankingResponse(ApiModel):
     rank: int
+    team_id: int = Field(alias="teamId")
     team_name: str = Field(alias="teamName")
     current_count: int = Field(alias="currentCount")
     finished: bool

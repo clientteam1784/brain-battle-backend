@@ -155,7 +155,8 @@ HTTP 응답 상태를 항상 기준으로 판단하고 body의 `status`는 선�
   "role": "teacher",
   "expiresIn": 28800,
   "studentId": null,
-  "teamId": null
+  "teamId": null,
+  "roomId": null
 }
 ```
 
@@ -190,13 +191,13 @@ HTTP 응답 상태를 항상 기준으로 판단하고 body의 `status`는 선�
   "role": "student",
   "expiresIn": 28800,
   "studentId": 15,
-  "teamId": 7
+  "teamId": 7,
+  "roomId": 1
 }
 ```
 
 같은 모둠의 같은 학번으로 재로그인하면 기존 학생을 사용합니다. 처음 로그인한 학번은
-해당 모둠에 자동 등록됩니다. 로그인 응답에 `roomId`는 없습니다. 프론트엔드는 교사가
-진행하는 방의 ID를 별도로 공유·보관해야 방 순위 API를 호출할 수 있습니다.
+해당 모둠에 자동 등록됩니다. 로그인 응답의 `roomId`(학생 전용, 교사는 `null`)로 방 순위 API를 호출할 수 있습니다.
 
 | HTTP status | message | status 필드 |
 | --- | --- | --- |
@@ -428,6 +429,7 @@ body 없음. `studentNumber`는 필수 query 문자열입니다. 실제 요청 �
 ```json
 {
   "teamId": 7,
+  "roomStarted": true,
   "submissionRound": 1,
   "correctCount": 1,
   "totalQuestions": 10,
@@ -452,6 +454,7 @@ body 없음. `studentNumber`는 필수 query 문자열입니다. 실제 요청 �
 | 필드 | 자료형 | 의미 |
 | --- | --- | --- |
 | teamId | integer | 모둠 ID |
+| roomStarted | boolean | 소속 방의 게임 시작 여부. 학생 대기 화면의 시작 감지에 사용 |
 | submissionRound | integer | 성공한 일괄 제출 횟수. 빈 일괄 제출도 증가 |
 | correctCount | integer | 현재 맞힌 문제 수 |
 | totalQuestions | integer | 현재 전체 등록 문제 수 |
@@ -566,6 +569,7 @@ body 없음. `studentNumber`는 필수 query 문자열입니다. 실제 요청 �
 ```json
 {
   "teamId": 7,
+  "roomStarted": true,
   "submissionRound": 1,
   "correctCount": 1,
   "totalQuestions": 10,
@@ -658,8 +662,8 @@ body 없음. `studentNumber`는 필수 query 문자열입니다. 실제 요청 �
 
 ```json
 [
-  {"rank": 1, "teamName": "2모둠", "currentCount": 10, "finished": true, "finishedAt": "2026-10-02T15:30:20"},
-  {"rank": 2, "teamName": "1모둠", "currentCount": 7, "finished": false, "finishedAt": null}
+  {"rank": 1, "teamId": 2, "teamName": "2모둠", "currentCount": 10, "finished": true, "finishedAt": "2026-10-02T15:30:20"},
+  {"rank": 2, "teamId": 1, "teamName": "1모둠", "currentCount": 7, "finished": false, "finishedAt": null}
 ]
 ```
 

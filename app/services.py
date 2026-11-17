@@ -373,6 +373,7 @@ def build_team_progress(session: Session, team_id: int) -> dict:
         )
     return {
         "teamId": team.id,
+        "roomStarted": team.room.started,
         "submissionRound": team.submission_round,
         "correctCount": team.current_count,
         "totalQuestions": len(questions),

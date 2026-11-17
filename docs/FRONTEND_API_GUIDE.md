@@ -47,7 +47,8 @@ Content-Type: application/json
   "role": "student",
   "expiresIn": 28800,
   "studentId": 15,
-  "teamId": 7
+  "teamId": 7,
+  "roomId": 1
 }
 ```
 
@@ -182,6 +183,7 @@ Authorization: Bearer {studentToken}
 ```json
 {
   "teamId": 7,
+  "roomStarted": true,
   "submissionRound": 1,
   "correctCount": 7,
   "totalQuestions": 10,

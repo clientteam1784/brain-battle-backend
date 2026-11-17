@@ -347,6 +347,27 @@ def test_student_scope_and_all_correct_completion(client: TestClient) -> None:
     assert ranking.status_code == 200
     assert ranking.json()[0]["currentCount"] == 10
     assert ranking.json()[0]["finished"] is True
+    assert ranking.json()[0]["teamId"] == team["id"]
+
+
+def test_progress_reports_room_started_and_login_returns_room_id(client: TestClient) -> None:
+    teacher = teacher_headers(client)
+    create_ten_questions(client, teacher)
+    room, team = create_team(client, teacher, "A팀")
+
+    login = client.post("/auth/student", json={"teamPin": team["pin"], "studentNumber": "1001"})
+    assert login.json()["roomId"] == room["id"]
+    assert client.post("/auth/teacher", json={"accessCode": "test-teacher-code"}).json()[
+        "roomId"
+    ] is None
+
+    student = {"Authorization": f"Bearer {login.json()['accessToken']}"}
+    before = client.get(f"/teams/{team['id']}/progress", headers=student)
+    assert before.json()["roomStarted"] is False
+
+    start_room(client, teacher, room["id"])
+    after = client.get(f"/teams/{team['id']}/progress", headers=student)
+    assert after.json()["roomStarted"] is True
 
 
 def test_answer_is_rejected_before_room_starts(client: TestClient) -> None:
