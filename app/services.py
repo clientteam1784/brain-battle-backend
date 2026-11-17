@@ -10,6 +10,14 @@ from app.models import Answer, Question, Room, Student, Team
 from app.schemas import AnswerStatus, BatchAnswerItem
 
 
+# DB 제약 위반이 기대한 제약(이름 또는 컬럼)에서 난 것인지 확인합니다.
+# MySQL은 제약 이름, SQLite는 "table.column"을 메시지에 담습니다.
+def _violates(exc: IntegrityError, *markers: str) -> bool:
+    message = str(exc.orig)
+    return any(marker in message for marker in markers)
+
+
+
 # 문제를 저장합니다. 중복 문제 번호는 DB 제약 오류를 사용자용 도메인 오류로 바꿉니다.
 def create_question(
     session: Session,
@@ -26,6 +34,8 @@ def create_question(
     try:
         session.flush()
     except IntegrityError as exc:
+        if not _violates(exc, "uq_question_number", "question.question_number"):
+            raise
         raise DomainError("이미 존재하는 문제 번호입니다.") from exc
     return question
 
@@ -52,6 +62,8 @@ def update_question(
     try:
         session.flush()
     except IntegrityError as exc:
+        if not _violates(exc, "uq_question_number", "question.question_number"):
+            raise
         raise DomainError("이미 존재하는 문제 번호입니다.") from exc
     return question
 
@@ -79,7 +91,11 @@ def create_room(session: Session) -> Room:
         room = Room(pin=_unique_pin(session, Room, "방"))
         session.add(room)
         session.flush()
-    except (DomainError, IntegrityError) as exc:
+    except DomainError as exc:
+        raise DomainError("방 생성에 실패했습니다.", 500, include_status=True) from exc
+    except IntegrityError as exc:
+        if not _violates(exc, "uq_room_pin", "room.pin"):
+            raise
         raise DomainError("방 생성에 실패했습니다.", 500, include_status=True) from exc
     return room
 
@@ -118,6 +134,8 @@ def create_team(session: Session, room_id: int, team_name: str) -> Team:
     try:
         session.flush()
     except IntegrityError as exc:
+        if not _violates(exc, "uq_team_room_name", "uq_team_pin", "team.name", "team.pin"):
+            raise
         raise DomainError("이미 존재하는 모둠 이름 또는 PIN입니다.") from exc
     return team
 
