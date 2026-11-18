@@ -110,6 +110,8 @@ def start_room(session: Session, room_id: int) -> Room:
     question_numbers = {question.question_number for question in list_questions(session)}
     if question_numbers != set(range(1, 11)):
         raise DomainError("게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다.")
+    if session.scalar(select(Team.id).where(Team.room_id == room.id).limit(1)) is None:
+        raise DomainError("참가자가 한 명 이상 있어야 시작할 수 있어요.")
     room.started = True
     session.flush()
     return room
@@ -162,6 +164,20 @@ def authenticate_student(session: Session, team_pin: str, student_number: str) -
         except IntegrityError as exc:
             raise DomainError("학생 등록 중 충돌이 발생했습니다.", 409) from exc
     return student
+
+
+# 방 PIN과 이름으로 입장한다. 참가자 한 명이 이름이 같은 모둠 하나가 되므로 이후 풀이·순위 흐름은 그대로 쓴다.
+def join_room(session: Session, room_pin: str, name: str) -> Student:
+    room = session.scalar(select(Room).where(Room.pin == room_pin))
+    if room is None:
+        raise DomainError("존재하지 않는 방 PIN입니다.", 401)
+    if room.started:
+        raise DomainError("이미 시작된 게임입니다.")
+    name = name.strip()
+    if not name:
+        raise DomainError("이름은 필수입니다.")
+    team = create_team(session, room.id, name)
+    return authenticate_student(session, team.pin, name)
 
 
 # 모둠 ID로 모둠 PIN을 찾은 뒤 공통 학생 인증 흐름을 재사용합니다.
