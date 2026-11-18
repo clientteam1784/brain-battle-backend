@@ -357,9 +357,10 @@ def test_progress_reports_room_started_and_login_returns_room_id(client: TestCli
 
     login = client.post("/auth/student", json={"teamPin": team["pin"], "studentNumber": "1001"})
     assert login.json()["roomId"] == room["id"]
-    assert client.post("/auth/teacher", json={"accessCode": "test-teacher-code"}).json()[
-        "roomId"
-    ] is None
+    assert (
+        client.post("/auth/teacher", json={"accessCode": "test-teacher-code"}).json()["roomId"]
+        is None
+    )
 
     student = {"Authorization": f"Bearer {login.json()['accessToken']}"}
     before = client.get(f"/teams/{team['id']}/progress", headers=student)
@@ -396,7 +397,8 @@ def test_join_room_with_room_pin_and_name(client: TestClient) -> None:
     teams = client.get(f"/rooms/{room['id']}/teams", headers=headers).json()
     assert [team["name"] for team in teams] == ["별빛토끼"]
 
-    assert client.post("/auth/join", json={"roomPin": room["pin"], "name": "별빛토끼"}).status_code == 400
+    duplicate = client.post("/auth/join", json={"roomPin": room["pin"], "name": "별빛토끼"})
+    assert duplicate.status_code == 400
     assert client.post("/auth/join", json={"roomPin": "000000", "name": "a"}).status_code == 401
 
 
@@ -410,3 +412,48 @@ def test_start_room_requires_a_participant(client: TestClient) -> None:
 
     client.post("/auth/join", json={"roomPin": room["pin"], "name": "별빛토끼"})
     assert client.patch(f"/rooms/{room['id']}/start", headers=headers).status_code == 200
+
+
+def test_join_room_trims_name_and_reports_errors(client: TestClient) -> None:
+    teacher = teacher_headers(client)
+    create_ten_questions(client, teacher)
+    room = client.post("/rooms", headers=teacher).json()
+
+    joined = client.post("/auth/join", json={"roomPin": room["pin"], "name": " 김철수 "})
+    assert joined.status_code == 200
+    body = joined.json()
+    assert body["role"] == "student"
+    assert body["roomId"] == room["id"]
+
+    teams = client.get(f"/rooms/{room['id']}/teams", headers=teacher).json()
+    assert [team["name"] for team in teams] == ["김철수"]
+    assert body["teamId"] == teams[0]["id"]
+
+    student = {"Authorization": f"Bearer {body['accessToken']}"}
+    assert client.get(f"/teams/{body['teamId']}/progress", headers=student).status_code == 200
+
+    duplicate = client.post("/auth/join", json={"roomPin": room["pin"], "name": "김철수"})
+    assert duplicate.status_code == 400
+    assert duplicate.json() == {"message": "이미 존재하는 모둠 이름입니다."}
+
+    missing = client.post("/auth/join", json={"roomPin": "000000", "name": "이영희"})
+    assert missing.status_code == 401
+    blank = client.post("/auth/join", json={"roomPin": room["pin"], "name": "   "})
+    assert blank.status_code == 400
+
+
+def test_join_is_rejected_after_start_and_start_needs_participants(client: TestClient) -> None:
+    teacher = teacher_headers(client)
+    create_ten_questions(client, teacher)
+    room = client.post("/rooms", headers=teacher).json()
+
+    empty_start = client.patch(f"/rooms/{room['id']}/start", headers=teacher)
+    assert empty_start.status_code == 400
+    assert empty_start.json()["message"] == "참가자가 한 명 이상 있어야 시작할 수 있어요."
+
+    assert client.post("/auth/join", json={"roomPin": room["pin"], "name": "A"}).status_code == 200
+    start_room(client, teacher, room["id"])
+
+    late = client.post("/auth/join", json={"roomPin": room["pin"], "name": "B"})
+    assert late.status_code == 400
+    assert late.json()["message"] == "이미 시작된 게임입니다."

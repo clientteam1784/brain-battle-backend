@@ -17,7 +17,6 @@ def _violates(exc: IntegrityError, *markers: str) -> bool:
     return any(marker in message for marker in markers)
 
 
-
 # 문제를 저장합니다. 중복 문제 번호는 DB 제약 오류를 사용자용 도메인 오류로 바꿉니다.
 def create_question(
     session: Session,
@@ -166,7 +165,8 @@ def authenticate_student(session: Session, team_pin: str, student_number: str) -
     return student
 
 
-# 방 PIN과 이름으로 입장한다. 참가자 한 명이 이름이 같은 모둠 하나가 되므로 이후 풀이·순위 흐름은 그대로 쓴다.
+# 방 PIN과 이름으로 입장한다. 참가자 한 명이 이름이 같은 모둠 하나가 되므로
+# 이후 풀이·순위 흐름은 그대로 쓴다.
 def join_room(session: Session, room_pin: str, name: str) -> Student:
     room = session.scalar(select(Room).where(Room.pin == room_pin))
     if room is None:

@@ -61,6 +61,7 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `POST` | `/auth/teacher` | 공개 | 교사 로그인 |
 | `POST` | `/auth/student` | 공개 | 팀 PIN으로 학생 로그인 |
+| `POST` | `/auth/join` | 공개 | 방 PIN과 이름으로 입장(모둠 자동 생성) |
 | `POST/PATCH/DELETE` | `/questions...` | 교사 | 문제 관리 |
 | `GET` | `/questions` | 교사/학생 | 1~10번 문제 목록 |
 | `POST` | `/rooms` | 교사 | 방 생성 |
