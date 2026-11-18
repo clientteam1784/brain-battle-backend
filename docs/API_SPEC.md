@@ -1,6 +1,6 @@
 # Brain Battle 백엔드 API 명세서
 
-현재 구현된 **19개 API 전체**를 정리한 문서입니다. 기준은 이 저장소의
+현재 구현된 **20개 API 전체**를 정리한 문서입니다. 기준은 이 저장소의
 `app/api.py`, `app/schemas.py`, `app/services.py`, `app/auth.py`, `app/exceptions.py`입니다.
 사람이 읽는 상세 계약은 이 문서, 프론트 화면 흐름은 [연동 가이드](./FRONTEND_API_GUIDE.md),
 자료형과 필수 필드의 기계 판독 계약은 [OpenAPI JSON](./openapi.json)을 참고합니다.
@@ -29,7 +29,7 @@
 | 운영 base URL | 아직 확정된 배포 주소 없음. 실제 배포 시 HTTPS 주소 설정 |
 | API prefix | 없음. `/api/questions` 대신 `/questions` 사용 |
 | 요청·응답 | JSON. body가 있는 요청은 `Content-Type: application/json` |
-| 인증 | `/health`, `/auth/teacher`, `/auth/student` 외 모든 API에 Bearer 토큰 필요 |
+| 인증 | `/health`, `/auth/teacher`, `/auth/student`, `/auth/join` 외 모든 API에 Bearer 토큰 필요 |
 | Swagger UI | 서버의 `/docs` |
 | 실행 중인 서버의 OpenAPI | 서버의 `/openapi.json` |
 | ID | JSON 정수. URL에서는 실제 ID 숫자로 치환 |
@@ -59,6 +59,7 @@ GET 요청에는 body가 없습니다. body가 없는 POST/PATCH도 body를 생�
 | GET | `/health` | 공개 | 서버 상태 확인 |
 | POST | `/auth/teacher` | 공개 | 교사 로그인 |
 | POST | `/auth/student` | 공개 | 모둠 PIN으로 학생 로그인 |
+| POST | `/auth/join` | 공개 | 방 PIN과 이름으로 입장(이름과 같은 모둠·학생 자동 생성) |
 | POST | `/questions` | 교사 | 문제 등록 |
 | GET | `/questions` | 교사·학생 | 문제 목록 조회 |
 | PATCH | `/questions/{question_id}` | 교사 | 문제 수정 |
@@ -205,6 +206,32 @@ HTTP 응답 상태를 항상 기준으로 판단하고 body의 `status`는 선�
 | 400 | `학번은 필수입니다.` | 없음 |
 | 409 | `학생 등록 중 충돌이 발생했습니다.` | 없음 |
 
+### `POST /auth/join`
+
+인증: 공개. **방 PIN**과 이름으로 입장합니다. 참가자 한 명이 모둠 한 개가 되도록, 서버가
+입력한 이름과 같은 모둠 1개와 학생 1명을 만들고 학생 토큰을 발급합니다. 응답 형식은
+`/auth/student`와 같습니다. 선생님의 `GET /rooms/{room_id}/teams` 목록에도 이 이름이 나타납니다.
+
+요청:
+
+```json
+{"roomPin": "123456", "name": "김철수"}
+```
+
+| 필드 | 자료형 | 조건 |
+| --- | --- | --- |
+| roomPin | string | 필수, 길이 정확히 6 |
+| name | string | 필수, 앞뒤 공백 제거, 공백만 있는 값 금지. 같은 방에서 중복 불가 |
+
+성공: `200` (응답은 `POST /auth/student`와 동일)
+
+| HTTP status | message | status 필드 |
+| --- | --- | --- |
+| 401 | `존재하지 않는 방 PIN입니다.` | 없음 |
+| 400 | `이미 시작된 게임입니다.` | 없음 |
+| 400 | `이미 존재하는 모둠 이름입니다.` | 없음 |
+| 400 | `이름은 필수입니다.` | 없음 |
+
 ## 문제 관리
 
 문제는 현재 방별로 분리되지 않고 전체 목록으로 관리됩니다. 게임 시작 전 문제 번호가
@@ -332,6 +359,7 @@ HTTP 응답 상태를 항상 기준으로 판단하고 body의 `status`는 선�
 | 404 | `존재하지 않는 방입니다.` | 있음 |
 | 400 | `이미 시작된 게임입니다.` | 있음 |
 | 400 | `게임 시작 전 1번부터 10번까지 문제를 등록해야 합니다.` | 없음 |
+| 400 | `참가자가 한 명 이상 있어야 시작할 수 있어요.` | 없음 |
 
 ## 모둠 및 학생 관리
 

@@ -87,6 +87,47 @@
         }
       }
     },
+    "/auth/join": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Join Room",
+        "operationId": "join_room_auth_join_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomJoinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/questions": {
       "get": {
         "tags": [
@@ -1288,6 +1329,27 @@
           "remainingCount"
         ],
         "title": "RemainingQuestionsResponse"
+      },
+      "RoomJoinRequest": {
+        "properties": {
+          "roomPin": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Roompin"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roomPin",
+          "name"
+        ],
+        "title": "RoomJoinRequest"
       },
       "RoomResponse": {
         "properties": {

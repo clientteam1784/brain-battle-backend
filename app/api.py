@@ -26,6 +26,7 @@ from app.schemas import (
     QuestionResponse,
     RankingResponse,
     RemainingQuestionsResponse,
+    RoomJoinRequest,
     RoomResponse,
     SingleAnswerResponse,
     StudentLoginRequest,
@@ -79,6 +80,16 @@ def login_student(request: StudentLoginRequest, session: DbSession) -> AuthToken
         request.team_pin,
         request.student_number,
     )
+    return _student_token(student)
+
+
+@router.post("/auth/join", response_model=AuthTokenResponse, tags=["auth"])
+# 방 PIN과 이름으로 입장한다. 이름이 선생님 화면의 참가자 목록에 나타난다.
+def join_room(request: RoomJoinRequest, session: DbSession) -> AuthTokenResponse:
+    return _student_token(services.join_room(session, request.room_pin, request.name))
+
+
+def _student_token(student) -> AuthTokenResponse:
     principal = Principal(role="student", student_id=student.id, team_id=student.team_id)
     token, expires_in = create_access_token(principal)
     return AuthTokenResponse(

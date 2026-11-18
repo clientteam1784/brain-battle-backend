@@ -44,6 +44,11 @@ class StudentLoginRequest(ApiModel):
     student_number: str = Field(alias="studentNumber", min_length=1)
 
 
+class RoomJoinRequest(ApiModel):
+    room_pin: str = Field(alias="roomPin", min_length=6, max_length=6)
+    name: str = Field(min_length=1)
+
+
 # 로그인 성공 시 클라이언트에 전달하는 토큰과 사용자 식별 정보입니다.
 class AuthTokenResponse(ApiModel):
     access_token: str = Field(alias="accessToken")

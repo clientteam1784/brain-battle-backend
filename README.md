@@ -6,7 +6,7 @@ Brain Battle의 FastAPI, SQLAlchemy 2.x, Alembic 백엔드입니다.
 
 ## API documentation
 
-- **[전체 API 명세서](docs/API_SPEC.md)**: 구현된 19개 API의 권한, request/response, 오류 응답
+- **[전체 API 명세서](docs/API_SPEC.md)**: 구현된 20개 API의 권한, request/response, 오류 응답
 - [프론트엔드 연동 가이드](docs/FRONTEND_API_GUIDE.md): 모둠 PIN 입장, 일괄 제출, 로테이션 화면 흐름
 - [OpenAPI JSON](docs/openapi.json): 필드 자료형·필수 여부와 기계 판독 계약
 
